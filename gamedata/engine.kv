@@ -54,6 +54,44 @@ sz_edict {
 	L4Dbased 16 // see engineapi.h comment
 }
 
+// VClient
+vtidx_VClient_DecodeUserCmdFromBuffer 22
+
+// CInput
+vtidx_CreateMove 3
+vtidx_DecodeUserCmdFromBuffer 7
+vtidx_GetUserCmd 8
+
+// ISurface
+vtidx_DrawSetColor 10
+vtidx_DrawFilledRect 12
+vtidx_DrawOutlinedRect 14
+vtidx_DrawLine 15
+vtidx_DrawPolyLine 16
+vtidx_DrawSetTextFont 17
+vtidx_DrawSetTextColor 18
+vtidx_DrawSetTextPos 20
+vtidx_DrawPrintText 22
+vtidx_GetScreenSize 37
+vtidx_CreateFont 64
+vtidx_SetFontGlyphSet 65
+vtidx_GetFontTall 67
+vtidx_GetCharacterWidth 71
+
+// CEngineVGui
+off_engineToolsPanel { OrangeBoxbased 140 }
+
+// vgui::Panel
+vtidx_SetPaintEnabled 67
+vtidx_Paint 123
+
+// ISchemeManager
+vtidx_GetScheme 5
+vtidx_GetIScheme 8
+
+// IScheme
+vtidx_GetFont 3
+
 // SendProp
 sz_SendProp {
 	// wrapping all these in 005 for right now.
