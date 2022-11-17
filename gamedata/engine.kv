@@ -33,10 +33,19 @@ vtidx_GetGameDirectory {
 	Client012 37 // dmomm, ep1, ...
 }
 vtidx_GetEngineBuildNumber {
-	L4D2 {
-		Client013 99
-		//Client014 ??? // TODO(compat): find out what this is (maybe 136?)
+	Client013 {
+		L4D2 99
+		Portal2 100
 	}
+	Client014 {
+		L4D2 31
+		2013 98
+	}
+	// in case we ever need these
+	//L4D1_1005 99
+	//L4D1_Steam 97
+	//Portal1_3420 91
+	//Portal1_5135 102
 }
 
 // IGameUIFuncs
@@ -54,43 +63,34 @@ sz_edict {
 	L4Dbased 16 // see engineapi.h comment
 }
 
-// VClient
-vtidx_VClient_DecodeUserCmdFromBuffer 22
-
-// CInput
-vtidx_CreateMove 3
-vtidx_DecodeUserCmdFromBuffer 7
-vtidx_GetUserCmd 8
-
-// ISurface
-vtidx_DrawSetColor 10
-vtidx_DrawFilledRect 12
-vtidx_DrawOutlinedRect 14
-vtidx_DrawLine 15
-vtidx_DrawPolyLine 16
-vtidx_DrawSetTextFont 17
-vtidx_DrawSetTextColor 18
-vtidx_DrawSetTextPos 20
-vtidx_DrawPrintText 22
-vtidx_GetScreenSize 37
-vtidx_CreateFont 64
-vtidx_SetFontGlyphSet 65
-vtidx_GetFontTall 67
-vtidx_GetCharacterWidth 71
-
-// CEngineVGui
-off_engineToolsPanel { OrangeBoxbased 140 }
-
 // vgui::Panel
-vtidx_SetPaintEnabled 67
-vtidx_Paint 123
-
-// ISchemeManager
-vtidx_GetScheme 5
-vtidx_GetIScheme 8
-
-// IScheme
-vtidx_GetFont 3
+vtidx_SetPaintEnabled {
+	default 67
+	Client013 {
+		L4D1 68
+		L4D2 {
+			default 71
+			L4D2_2147 72
+			TheLastStand 72
+		}
+	}
+	Client014 {
+		L4D2 70
+	}
+}
+vtidx_Paint {
+	default 123
+	Client014 {
+		L4D2 126 // 2000
+	}
+	Client013 {
+		L4D2 {
+			default 127 // 2045
+			L4D2_2147 128
+			TheLastStand 128
+		}
+	}
+}
 
 // SendProp
 sz_SendProp {
@@ -124,7 +124,8 @@ off_SP_offset {
 	//2013 72 // TODO(compat): not sure about 2013/009 yet pt3
 }
 
-// IEngineVGuiInternal/CEngineVGui
+// IEngineVGui/IEngineVGuiInternal/CEngineVGui
+vtidx_GetPanel "0 + NVDTOR"
 vtidx_VGuiConnect { // note: the actual name is Connect() but that's too generic
 	default "3 + NVDTOR"
 	L4Dbased "4 + NVDTOR" // ActivateGameUI added

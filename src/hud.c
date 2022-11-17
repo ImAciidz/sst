@@ -1,5 +1,6 @@
 /*
  * Copyright © 2022 Matthew Wozniak <sirtomato999@gmail.com>
+ * Copyright © 2022 Willian Henrique <wsimanbrazil@yahoo.com.br>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,16 +20,17 @@
 #include "event.h"
 #include "feature.h"
 #include "gamedata.h"
+#include "gametype.h"
 #include "hook.h"
 #include "hud.h"
 #include "mem.h"
 #include "os.h"
 #include "vcall.h"
+#include "x86.h"
+#include "x86util.h"
 
-// windows api
-#ifdef CreateFont
+// avoid windows api conflict
 #undef CreateFont
-#endif
 
 struct hscheme { ulong handle; };
 enum fontdrawtype {
@@ -40,6 +42,7 @@ enum fontdrawtype {
 
 FEATURE("hud painting")
 REQUIRE_GLOBAL(factory_engine)
+
 // ISurface
 REQUIRE_GAMEDATA(vtidx_DrawSetColor)
 REQUIRE_GAMEDATA(vtidx_DrawFilledRect)
@@ -56,7 +59,7 @@ REQUIRE_GAMEDATA(vtidx_CreateFont)
 REQUIRE_GAMEDATA(vtidx_SetFontGlyphSet)
 REQUIRE_GAMEDATA(vtidx_GetCharacterWidth)
 // CEngineVGui
-REQUIRE_GAMEDATA(off_engineToolsPanel)
+REQUIRE_GAMEDATA(vtidx_GetPanel)
 // vgui::Panel
 REQUIRE_GAMEDATA(vtidx_SetPaintEnabled)
 REQUIRE_GAMEDATA(vtidx_Paint)
@@ -83,6 +86,9 @@ DECL_VFUNC_DYN(int, GetFontTall, struct hfont)
 DECL_VFUNC_DYN(struct hfont, CreateFont)
 DECL_VFUNC_DYN(bool, SetFontGlyphSet, struct hfont, const char *, int, int,
 		int, int, int, int, int)
+#define vtidx_SetFontGlyphSet_old vtidx_SetFontGlyphSet
+DECL_VFUNC_DYN(bool, SetFontGlyphSet_old, struct hfont,
+		const char *, int, int, int, int, int)
 DECL_VFUNC_DYN(int, GetCharacterWidth, struct hfont, int)
 // vgui::Panel
 DECL_VFUNC_DYN(void, SetPaintEnabled, bool)
@@ -142,9 +148,17 @@ int hud_getcharwidth(struct hfont font, int ch) {
 
 struct hfont hud_createfont(const char *fontname, int tall, int weight,
 		int blur, int scanlines, int flags) {
+	bool set_glyphset;
 	struct hfont font = CreateFont(mss);
-	if (SetFontGlyphSet(mss, font, fontname, tall, weight, blur, scanlines,
-				flags, 0, 0)) return font;
+	if (GAMETYPE_MATCHES(L4D1) || GAMETYPE_MATCHES(Portal1_3420)) {
+		set_glyphset = SetFontGlyphSet_old(mss, font, fontname, tall, weight,
+			blur, scanlines, flags);
+	}
+	else {
+		set_glyphset = SetFontGlyphSet(mss, font, fontname, tall, weight, blur,
+			scanlines, flags, 0, 0xFF);
+	}
+	if (set_glyphset) return font;
 	return (struct hfont){0};
 }
 
@@ -154,6 +168,26 @@ void VCALLCONV hook_Paint(void *this) {
 	}
 	orig_Paint(this);
 }
+
+static bool find_enginetoolspanel(void *enginevgui) {
+	void *vgui_getpanel = (*(void***)enginevgui)[vtidx_GetPanel];
+	for (uchar *p = (uchar *)vgui_getpanel; p - (uchar *)vgui_getpanel < 16;) {
+		// first CALL instruction in GetPanel calls GetRootPanel, which gives a
+		// pointer to the specified panel
+		if (p[0] == X86_CALL) {
+			void *(*__thiscall GetRootPanel)(void *this, int panel_type);
+			int offset = mem_load32(p + 1);
+			p += x86_len(p);
+			GetRootPanel = (void *(*__thiscall)(void *, int))(p + offset);
+			// PANEL_TOOLS == 3
+			toolspanel = GetRootPanel(enginevgui, 3);
+			return true;
+		}
+		NEXT_INSN(p, "CEngineVGui::GetRootPanel pointer");
+	}
+	return false;
+}
+
 INIT {
 	mss = factory_engine("MatSystemSurface006", 0);
 	void *enginevgui = factory_engine("VEngineVGui001", 0);
@@ -162,7 +196,10 @@ INIT {
 		errmsg_errorx("couldn't get interfaces");
 		return false;
 	}
-	toolspanel = mem_loadptr(mem_offset(enginevgui, off_engineToolsPanel));
+	if (!find_enginetoolspanel(enginevgui)) {
+		errmsg_errorx("couldn't find engine tools panel");
+		return false;
+	}
 	void **vtable = *(void***)toolspanel;
 	if (!os_mprot(vtable + vtidx_Paint, sizeof(void *),
 			PAGE_READWRITE)) {

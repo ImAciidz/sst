@@ -1,5 +1,6 @@
 /*
  * Copyright © 2022 Matthew Wozniak <sirtomato999@gmail.com>
+ * Copyright © 2022 Willian Henrique <wsimanbrazil@yahoo.com.br>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,6 +20,7 @@
 #include "errmsg.h"
 #include "feature.h"
 #include "gamedata.h"
+#include "gametype.h"
 #include "hook.h"
 #include "hud.h"
 #include "mem.h"
@@ -36,12 +38,18 @@ REQUIRE_GLOBAL(factory_client)
 REQUIRE(hud)
 
 DECL_VFUNC_DYN(struct CUserCmd *, GetUserCmd, int)
+DECL_VFUNC(struct CUserCmd *, GetUserCmd_L4Dbased, vtidx_GetUserCmd, int, int)
 
 typedef void (*VCALLCONV CreateMove_func)(void *, int, float, bool);
 typedef void (*VCALLCONV DecodeUserCmdFromBuffer_func)(void *, void *, int);
+typedef void (*VCALLCONV DecodeUserCmdFromBuffer_L4Dbased_func)(void *, int,
+																void *, int);
 
 static CreateMove_func orig_CreateMove;
-static DecodeUserCmdFromBuffer_func orig_DecodeUserCmdFromBuffer;
+static union {
+	DecodeUserCmdFromBuffer_func def;
+	DecodeUserCmdFromBuffer_L4Dbased_func L4Dbased;
+} orig_DecodeUserCmdFromBuffer;
 static void *input = 0;
 static struct hfont font;
 static int buttons;
@@ -137,24 +145,40 @@ static inline bool find_input(void* vclient) {
 	return false;
 }
 
+static struct CUserCmd *get_usercmd(int nslot, int seq) {
+	if (GAMETYPE_MATCHES(L4Dbased))
+		return GetUserCmd_L4Dbased(input, nslot, seq);
+	return GetUserCmd(input, seq);
+}
+
 void VCALLCONV hook_CreateMove(void *this, int seq, float ft, bool active) {
 	orig_CreateMove(this, seq, ft, active);
-	struct CUserCmd *cmd = GetUserCmd(this, seq);
+	struct CUserCmd *cmd = get_usercmd(-1, seq);
 	if (cmd) buttons = cmd->buttons;
 }
 
 void VCALLCONV hook_DecodeUserCmdFromBuffer(void *this, void *reader, int seq) {
-	orig_DecodeUserCmdFromBuffer(this, reader, seq);
-	struct CUserCmd *cmd = GetUserCmd(this, seq);
+	orig_DecodeUserCmdFromBuffer.def(this, reader, seq);
+	struct CUserCmd *cmd = get_usercmd(-1, seq);
 	if (cmd) buttons = cmd->buttons;
 }
 
+void VCALLCONV hook_DecodeUserCmdFromBuffer_L4Dbased(void *this, int nslot,
+		void *reader, int seq) {
+	orig_DecodeUserCmdFromBuffer.L4Dbased(this, nslot, reader, seq);
+	struct CUserCmd *cmd = get_usercmd(nslot, seq);
+	if (cmd) buttons = cmd->buttons;
+}
 
 INIT {
-	void *vclient = factory_client("VClient015", 0);
-	if (!vclient) {
-		errmsg_errorx("couldn't get client interface");
-		return false;
+	void *vclient;
+	if (!(vclient = factory_client("VClient015", 0))) {
+		if (!(vclient = factory_client("VClient016", 0))) {
+			if (!(vclient = factory_client("VClient017", 0))) {
+				errmsg_errorx("couldn't get client interface");
+				return false;
+			}
+		}
 	}
 	if (!find_input(vclient)) {
 		errmsg_errorx("couldn't find cinput global");
@@ -173,9 +197,18 @@ INIT {
 	}
 	orig_CreateMove = (CreateMove_func)hook_vtable(vtable, vtidx_CreateMove,
 			(void *)hook_CreateMove);
-	orig_DecodeUserCmdFromBuffer = (DecodeUserCmdFromBuffer_func)hook_vtable(
-			vtable, vtidx_DecodeUserCmdFromBuffer,
-			(void *)hook_DecodeUserCmdFromBuffer);
+	if (GAMETYPE_MATCHES(L4Dbased)) {
+		orig_DecodeUserCmdFromBuffer.L4Dbased =
+			(DecodeUserCmdFromBuffer_L4Dbased_func)hook_vtable(
+				vtable, vtidx_DecodeUserCmdFromBuffer,
+				(void *)hook_DecodeUserCmdFromBuffer_L4Dbased);
+	}
+	else {
+		orig_DecodeUserCmdFromBuffer.def =
+			(DecodeUserCmdFromBuffer_func)hook_vtable(
+				vtable, vtidx_DecodeUserCmdFromBuffer,
+				(void *)hook_DecodeUserCmdFromBuffer);
+	}
 	// unhide cvars
 	sst_ihud->base.flags &= ~CON_HIDDEN;
 	sst_ihud_gap->base.flags &= ~CON_HIDDEN;
@@ -193,7 +226,7 @@ END {
 	void **vtable = *(void ***)input;
 	unhook_vtable(vtable, vtidx_CreateMove, (void *)orig_CreateMove);
 	unhook_vtable(vtable, vtidx_DecodeUserCmdFromBuffer,
-			(void *)orig_DecodeUserCmdFromBuffer);
+			(void *)orig_DecodeUserCmdFromBuffer.def);
 }
 
 // vi: sw=4 ts=4 noet tw=80 cc=80
