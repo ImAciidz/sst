@@ -80,6 +80,7 @@ setlocal DisableDelayedExpansion
 :+ hexcolour.c
 :+ hook.c
 :+ hud.c
+:+ ihud.c
 :+ kv.c
 :+ kvsys.c
 :+ l4dmm.c

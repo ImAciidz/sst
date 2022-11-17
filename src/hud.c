@@ -1,5 +1,6 @@
 /*
  * Copyright © 2022 Matthew Wozniak <sirtomato999@gmail.com>
+ * Copyright © 2022 Willian Henrique <wsimanbrazil@yahoo.com.br>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -175,7 +176,7 @@ INIT {
 		errmsg_errorsys("couldn't make virtual table writable");
 		return false;
 	}
-	orig_Paint = (Paint_func)hook_vtable(vtable, vtidx_Paint,
+	orig_Paint = (Paint_func)hook_vtable(toolspanelvt, vtidx_Paint,
 			(void *)&hook_Paint);
 	SetPaintEnabled(toolspanel, true);
 	// 1 is the default, first loaded scheme. should always be sourcescheme.res

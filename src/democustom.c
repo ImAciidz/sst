@@ -23,6 +23,7 @@
 #include "errmsg.h"
 #include "feature.h"
 #include "gamedata.h"
+#include "gametype.h"
 #include "intdefs.h"
 #include "mem.h"
 #include "ppmagic.h"
@@ -100,6 +101,8 @@ static bool find_WriteMessages(void) {
 }
 
 DECL_VFUNC_DYN(int, GetEngineBuildNumber)
+
+PREINIT { return GAMETYPE_MATCHES(L4D2); }
 
 INIT {
 	// More UncraftedkNowledge:
