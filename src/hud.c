@@ -30,7 +30,7 @@
 #include "x86.h"
 #include "x86util.h"
 
-FEATURE()
+FEATURE("hud painting")
 REQUIRE_GLOBAL(factory_engine)
 REQUIRE_GLOBAL(vgui)
 // ISurface
