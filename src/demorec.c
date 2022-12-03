@@ -43,6 +43,7 @@ static bool wantstop = false;
 #define SIGNONSTATE_NEW 3
 #define SIGNONSTATE_SPAWN 5
 #define SIGNONSTATE_FULL 6
+#define RGBA(r, g, b, a) (&(struct con_colour){(r), (g), (b), (a)})
 
 typedef void (*VCALLCONV SetSignonState_func)(void *, int);
 static SetSignonState_func orig_SetSignonState;
@@ -145,7 +146,8 @@ static void hook_record_cb(const struct con_cmdargs *args) {
 		// For UX, make it more obvious we're recording, in particular when not
 		// already in a map as the "recording to x.dem" won't come up yet.
 		// mike: I think this is questionably necessary but I'm outvoted :)
-		con_msg("Demo recording started\n");
+		con_colourmsg(RGBA(255, 0, 0, 255), "Demo recording started\n");
+		con_colourmsg(RGBA(255, 0, 0, 255), "Micropenis gaming\n");
 	}
 }
 

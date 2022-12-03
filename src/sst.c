@@ -212,7 +212,7 @@ static void do_featureinit(void) {
 #endif
 	fixes_apply();
 
-	con_colourmsg(RGBA(64, 255, 64, 255),
+	con_colourmsg(RGBA(255, 0, 0, 255),
 			LONGNAME " v" VERSION " successfully loaded");
 	con_colourmsg(RGBA(255, 255, 255, 255), " for game ");
 	con_colourmsg(RGBA(0, 255, 255, 255), "%s\n", gameinfo_title);
