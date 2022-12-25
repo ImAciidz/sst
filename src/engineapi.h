@@ -170,6 +170,7 @@ struct ServerClass {
 extern struct VEngineClient *engclient;
 extern struct VEngineServer *engserver;
 extern void *globalvars;
+extern void *inputsystem;
 
 /*
  * Called on plugin init to attempt to initialise various core interfaces.
