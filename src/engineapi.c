@@ -1,5 +1,6 @@
 /*
  * Copyright © 2022 Michael Smith <mikesmiffy128@gmail.com>
+ * Copyright © 2023 Willian Henrique <wsimanbrazil@yahoo.com.br>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -45,6 +46,54 @@ DECL_VFUNC_DYN(void *, GetAllServerClasses)
 DECL_VFUNC(int, GetEngineBuildNumber_newl4d2, 99) // duping gamedata entry, yuck
 
 #include <entpropsinit.gen.h>
+
+// nasty terrible horrible globals for jumpstuff to use
+bool has_off_fallvel;
+int off_fallvel;
+
+static void initjumpprops(struct ServerClass *class) {
+	if (!(has_off_SP_dt)) return;
+	for (; class; class = class->next) {
+		if (!strcmp(class->name, "CBasePlayer")) {
+			struct SendTable *st = class->table,
+				*st_local = NULL, *st_mlocal = NULL;
+			for (struct SendProp *p = st->props;
+					mem_diff(p, st->props) < st->nprops * sz_SendProp;
+					p = mem_offset(p, sz_SendProp)) {
+				const char *varname = mem_loadptr(mem_offset(p, off_SP_varname));
+				if (!strcmp(varname, "localdata")) {
+					st_local = mem_loadptr(mem_offset(p, off_SP_dt));
+					break;
+				}
+			}
+			if (!st_local) break;
+
+			for (struct SendProp *p = st_local->props;
+					mem_diff(p, st_local->props) < st_local->nprops * sz_SendProp;
+					p = mem_offset(p, sz_SendProp)) {
+				const char *varname = mem_loadptr(mem_offset(p, off_SP_varname));
+				if (!strcmp(varname, "m_Local")) {
+					st_mlocal = mem_loadptr(mem_offset(p, off_SP_dt));
+					off_fallvel = abs(*(int *)mem_offset(p, off_SP_offset));
+					break;
+				}
+			}
+			if (!st_mlocal) break;
+
+			for (struct SendProp *p = st_mlocal->props;
+					mem_diff(p, st_mlocal->props) < st_mlocal->nprops * sz_SendProp;
+					p = mem_offset(p, sz_SendProp)) {
+				const char *varname = mem_loadptr(mem_offset(p, off_SP_varname));
+				if (!strcmp(varname, "m_flFallVelocity")) {
+					has_off_fallvel = true;
+					off_fallvel += abs(*(int *)mem_offset(p, off_SP_offset));
+					break;
+				}
+			}
+			break;
+		}
+	}
+}
 
 bool engineapi_init(int pluginver) {
 	if (!con_detect(pluginver)) return false;
@@ -101,7 +150,9 @@ bool engineapi_init(int pluginver) {
 	if (!gameinfo_init()) { con_disconnect(); return false; }
 	if (has_vtidx_GetAllServerClasses && has_sz_SendProp &&
 			has_off_SP_varname && has_off_SP_offset) {
-		initentprops(GetAllServerClasses(srvdll));
+		struct ServerClass *class_head = GetAllServerClasses(srvdll);
+		initentprops(class_head);
+		initjumpprops(class_head);
 	}
 	return true;
 }

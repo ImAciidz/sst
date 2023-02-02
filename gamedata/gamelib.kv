@@ -7,7 +7,13 @@ vtidx_CheckJumpButton {
 	L4DS	"33 + NVDTOR"
 	Portal2	"35 + NVDTOR"
 }
+off_gm_player 4
 off_mv 8
+
+// CTakeDamageInfo
+off_inflictor { L4D2 48 }
+off_dmg { L4D2 60 }
+off_dmgtype { L4D2 72 }
 
 // IServerGameDLL
 vtidx_GetAllServerClasses {
@@ -21,12 +27,20 @@ vtidx_GetBaseEntity "4 + NVDTOR"
 
 // CBaseEntity or CBasePlayer or something
 off_netprop_statechanged { L4D 88 }
+off_classname { L4D2 108 }
 off_simtime { L4D 128 }
 vtidx_Teleport {
 	L4D "104 + NVDTOR"
 	L4D2 {
 		default "116 + NVDTOR" // TODO(linux): might actually be 119!?!?
 		TheLastStand "117 + NVDTOR" // I dunno why JAiZ changed this
+	}
+}
+
+vtidx_OnTakeDamage {
+	L4D2 {
+		default "70 + NVDTOR"
+		TheLastStand "71 + NVDTOR"
 	}
 }
 
