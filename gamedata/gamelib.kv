@@ -11,9 +11,18 @@ off_gm_player 4
 off_mv 8
 
 // CTakeDamageInfo
-off_inflictor { L4D2 48 }
-off_dmg { L4D2 60 }
-off_dmgtype { L4D2 72 }
+off_inflictor {
+	L4D1 36 // probably OrangeBox
+	L4D2 48
+}
+off_dmg {
+	L4D1 44 // probably OrangeBox
+	L4D2 60
+}
+off_dmgtype {
+	L4D1 56 // probably OrangeBox
+	L4D2 72
+}
 
 // IServerGameDLL
 vtidx_GetAllServerClasses {
@@ -28,6 +37,7 @@ vtidx_GetBaseEntity "4 + NVDTOR"
 // CBaseEntity or CBasePlayer or something
 off_netprop_statechanged { L4D 88 }
 off_classname {
+	L4D1 100
 	L4D2 {
 		default 108
 		L4D2_2147 116
@@ -44,6 +54,7 @@ vtidx_Teleport {
 }
 
 vtidx_OnTakeDamage {
+	L4D "61 + NVDTOR"
 	L4D2 {
 		default "70 + NVDTOR"
 		TheLastStand "71 + NVDTOR"
