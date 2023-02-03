@@ -43,8 +43,6 @@ void *globalvars;
 
 DECL_VFUNC_DYN(void *, GetAllServerClasses)
 
-DECL_VFUNC(int, GetEngineBuildNumber_newl4d2, 99) // duping gamedata entry, yuck
-
 #include <entpropsinit.gen.h>
 
 // nasty terrible horrible globals for jumpstuff to use

@@ -27,8 +27,14 @@ vtidx_GetBaseEntity "4 + NVDTOR"
 
 // CBaseEntity or CBasePlayer or something
 off_netprop_statechanged { L4D 88 }
-off_classname { L4D2 108 }
-off_simtime { L4D 128 }
+off_classname {
+	L4D2 {
+		default 108
+		L4D2_2147 116
+		TheLastStand 116
+	}
+}
+off_simtime { L4D 128 } // i guess this one should also change in 2147/TLS
 vtidx_Teleport {
 	L4D "104 + NVDTOR"
 	L4D2 {
