@@ -88,6 +88,8 @@ DEF_CVAR(sst_ihud_colour_pressed, "IHud key colour when pressed (hex)",
 		"FFFFFFC8", CON_ARCHIVE | CON_HIDDEN)
 DEF_CVAR(sst_ihud_gap, "IHud key gap (pixels)", 5, CON_ARCHIVE | CON_HIDDEN)
 DEF_CVAR(sst_ihud_keysize, "IHud key size (pixels)", 60, CON_ARCHIVE | CON_HIDDEN)
+DEF_CVAR(sst_ihud_x, "IHud x sex position", 0, CON_ARCHIVE | CON_HIDDEN)
+DEF_CVAR(sst_ihud_y, "IHud y vertical sex position", 0, CON_ARCHIVE | CON_HIDDEN)
 
 // portalcolours.c:48
 static void colourcb(struct con_var *v) {
@@ -106,10 +108,12 @@ HANDLE_EVENT(HudPaint) {
 	hud_getscreensize(&w, &h);
 	int gap = con_getvari(sst_ihud_gap);
 	int size = con_getvari(sst_ihud_keysize);
+	int xoffset = con_getvari(sst_ihud_x);
+	int yoffset = con_getvari(sst_ihud_y);
 	for (struct key *k = layouts[0]; k->button; k++) {
 		struct rgba_colour colour = buttons & k->button ? pressed : unpressed;
-		int x0 = size * k->x + gap * (k->x+1);
-		int y0 = h - size * (k->y+1) - gap * (k->y+1);
+		int x0 = xoffset + (size * k->x + gap * (k->x+1));
+		int y0 = -1*(yoffset) + (h - size * (k->y+1) - gap * (k->y+1));
 		int x1 = x0 + size * k->w + gap * (k->w-1);
 		int y1 = y0 + size * k->h + gap * (k->h-1);
 		hud_drawrect(x0, y0, x1, y1, colour, true);
@@ -212,6 +216,8 @@ INIT {
 	sst_ihud_colour_pressed->cb = &colourcb;
 	sst_ihud_colour_normal->base.flags &= ~CON_HIDDEN;
 	sst_ihud_colour_normal->cb = &colourcb;
+	sst_ihud_x->base.flags &= ~CON_HIDDEN;
+	sst_ihud_y->base.flags &= ~CON_HIDDEN;
 	return true;
 }
 
