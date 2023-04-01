@@ -52,6 +52,7 @@ static void generalfixes(void) {
 	unhide("demo_pauseatservertick");
 	unhide("demo_quitafterplayback");
 	unhide("demo_interpolateview");
+	unhide("cl_showdemooverlay");
 
 	// some handy console stuff
 	unhide("con_filter_enable");
