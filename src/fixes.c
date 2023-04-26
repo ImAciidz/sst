@@ -173,6 +173,12 @@ static void l4d1specific(void) {
 
 	// same thing as above, seemed easier to just dupe :)
 	chcmdflags("cl_fullupdate", CON_CHEAT, 0);
+
+	// These commands lack FCVAR_CLIENTCMD_CAN_EXECUTE, so enabling/disabling
+	// addons does not work unless you manually run these in the console
+	// after making your changes. Good job Valve.
+	chcmdflags("mission_reload", 0, CON_CCMDEXEC);
+	chcmdflags("update_addon_paths", 0, CON_CCMDEXEC);
 }
 
 void fixes_apply(void) {
