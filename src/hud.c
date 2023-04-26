@@ -105,6 +105,7 @@ DECL_VFUNC_DYN(int, GetEngineBuildNumber)
 static void *mss;
 
 static void *toolspanel;
+static void** toolspanelvt;
 typedef void (*VCALLCONV Paint_func)(void *);
 Paint_func orig_Paint;
 
@@ -181,13 +182,13 @@ INIT {
 		return false;
 	}
 	toolspanel = mem_loadptr(mem_offset(enginevgui, off_engineToolsPanel));
-	void **vtable = *(void***)toolspanel;
-	if (!os_mprot(vtable + vtidx_Paint, sizeof(void *),
+	toolspanelvt = *(void***)toolspanel;
+	if (!os_mprot(toolspanelvt + vtidx_Paint, sizeof(void *),
 			PAGE_READWRITE)) {
 		errmsg_errorsys("couldn't make virtual table writable");
 		return false;
 	}
-	orig_Paint = (Paint_func)hook_vtable(vtable, vtidx_Paint,
+	orig_Paint = (Paint_func)hook_vtable(toolspanelvt, vtidx_Paint,
 			(void *)&hook_Paint);
 	SetPaintEnabled(toolspanel, true);
 	// 1 is the default, first loaded scheme. should always be sourcescheme.res
@@ -196,8 +197,10 @@ INIT {
 }
 
 END {
-	unhook_vtable(*(void***)toolspanel, vtidx_Paint, (void*)orig_Paint);
-	SetPaintEnabled(toolspanel, false);
+	if (toolspanelvt == *(void***)toolspanel) { 
+		unhook_vtable(*(void***)toolspanel, vtidx_Paint, (void*)orig_Paint);
+		SetPaintEnabled(toolspanel, false);
+	}
 }
 
 // vi: sw=4 ts=4 noet tw=80 cc=80
