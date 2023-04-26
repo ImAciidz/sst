@@ -100,7 +100,7 @@ DECL_VFUNC_DYN(struct hfont, GetFont, const char *, bool)
 
 static void *mss;
 
-static void *toolspanel;
+static void *toolspanel, **toolspanelvt;
 typedef void (*VCALLCONV Paint_func)(void *);
 static Paint_func orig_Paint;
 
@@ -200,13 +200,13 @@ INIT {
 		errmsg_errorx("couldn't find engine tools panel");
 		return false;
 	}
-	void **vtable = *(void***)toolspanel;
-	if (!os_mprot(vtable + vtidx_Paint, sizeof(void *),
+	toolspanelvt = *(void***)toolspanel;
+	if (!os_mprot(toolspanelvt + vtidx_Paint, sizeof(void *),
 			PAGE_READWRITE)) {
 		errmsg_errorsys("couldn't make virtual table writable");
 		return false;
 	}
-	orig_Paint = (Paint_func)hook_vtable(vtable, vtidx_Paint,
+	orig_Paint = (Paint_func)hook_vtable(toolspanelvt, vtidx_Paint,
 			(void *)&hook_Paint);
 	SetPaintEnabled(toolspanel, true);
 	// 1 is the default, first loaded scheme. should always be sourcescheme.res
@@ -215,8 +215,13 @@ INIT {
 }
 
 END {
-	unhook_vtable(*(void***)toolspanel, vtidx_Paint, (void*)orig_Paint);
-	SetPaintEnabled(toolspanel, false);
+	// Check if the toolspanel has unloaded by checking if the vtable pointer
+	// is still valid. If it's not, assume that the game is exiting and do
+	// nothing (since there's no need to fix up anything at that point).
+	if (toolspanelvt == *(void***)toolspanel) { 
+		unhook_vtable(toolspanelvt, vtidx_Paint, (void*)orig_Paint);
+		SetPaintEnabled(toolspanel, false);
+	}
 }
 
 // vi: sw=4 ts=4 noet tw=80 cc=80
