@@ -75,6 +75,7 @@ setlocal DisableDelayedExpansion
 :+ hud.c
 :+ ihud.c
 :+ kv.c
+:+ l4dvotereset.c
 :+ l4dwarp.c
 :+ nomute.c
 :+ nosleep.c

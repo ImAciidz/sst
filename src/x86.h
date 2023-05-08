@@ -346,65 +346,66 @@
 
 /* Second bytes of opcodes with a ModRM */
 #define X86_OPS_2BYTE_MRM(X) \
-	X(X86_2B_NOP,      0x0D) /* Variable length NOP (3-9 with prefix) */ \
-	X(X86_2B_HINTS1,   0x18) /* Prefetch and hint-nop block 1/8 */ \
-	X(X86_2B_HINTS2,   0x19) /* Prefetch and hint-nop block 2/8 */ \
-	X(X86_2B_HINTS3,   0x1A) /* Prefetch and hint-nop block 3/8 */ \
-	X(X86_2B_HINTS4,   0x1B) /* Prefetch and hint-nop block 4/8 */ \
-	X(X86_2B_HINTS5,   0x1C) /* Prefetch and hint-nop block 5/8 */ \
-	X(X86_2B_HINTS6,   0x1D) /* Prefetch and hint-nop block 6/8 */ \
-	X(X86_2B_HINTS7,   0x1E) /* Prefetch and hint-nop block 7/8 */ \
-	X(X86_2B_HINTS8,   0x1F) /* Prefetch and hint-nop block 8/8 */ \
-	X(X86_2B_CMOVO,    0x40) \
-	X(X86_2B_CMOVNO,   0x41) \
-	X(X86_2B_CMOVB,    0x42) /* AKA CMOVC */ \
-	X(X86_2B_CMOVNB,   0x43) /* AKA CMOVNC */ \
-	X(X86_2B_CMOVZ,    0x44) /* AKA CMOVE */ \
-	X(X86_2B_CMOVNZ,   0x45) /* AKA CMOVNE */ \
-	X(X86_2B_CMOVNA,   0x46) /* AKA CMOVBE */ \
-	X(X86_2B_CMOVA,    0x47) /* AKA CMOVNBE */ \
-	X(X86_2B_CMOVS,    0x48) \
-	X(X86_2B_CMOVNS,   0x49) \
-	X(X86_2B_CMOVP,    0x4A) \
-	X(X86_2B_CMOVNP,   0x4B) \
-	X(X86_2B_CMOVL,    0x4C) /* AKA CMOVNGE */ \
-	X(X86_2B_CMOVNL,   0x4D) /* AKA CMOVGE */ \
-	X(X86_2B_CMOVNG,   0x4E) /* AKA CMOVLE */ \
-	X(X86_2B_CMOVG,    0x4F) /* AKA CMOVNLE */ \
-	X(X86_2B_SETO,     0x90) \
-	X(X86_2B_SETNO,    0x91) \
-	X(X86_2B_SETB,     0x92) /* AKA SETC */ \
-	X(X86_2B_SETNB,    0x93) /* AKA SETNC */ \
-	X(X86_2B_SETZ,     0x94) /* AKA SETE */ \
-	X(X86_2B_SETNZ,    0x95) /* AKA SETNZ */ \
-	X(X86_2B_SETNA,    0x96) /* AKA SETBE */ \
-	X(X86_2B_SETA,     0x97) /* AKA SETNBE */ \
-	X(X86_2B_SETS,     0x98) \
-	X(X86_2B_SETNS,    0x99) \
-	X(X86_2B_SETP,     0x9A) \
-	X(X86_2B_SETNP,    0x9B) \
-	X(X86_2B_SETL,     0x9C) /* AKA SETNGE */ \
-	X(X86_2B_SETNL,    0x9D) /* AKA SETGE */ \
-	X(X86_2B_SETNG,    0x9E) /* AKA SETLE */ \
-	X(X86_2B_SETG,     0x9F) /* AKA SETNLE */ \
-	X(X86_2B_BTMR,     0xA3) \
-	X(X86_2B_SHLDMRCL, 0xA5) \
-	X(X86_2B_BTS,      0xAB) \
-	X(X86_2B_SHRDMRCL, 0xAD) \
-	X(X86_2B_MISC,     0xAE) /* Float env stuff, memory fences */ \
-	X(X86_2B_IMUL,     0xAF) \
-	X(X86_2B_CMPXCHG8, 0xB0) \
-	X(X86_2B_CMPXCHGW, 0xB1) \
-	X(X86_2B_MOVZX8,   0xB6) \
-	X(X86_2B_MOVZXW,   0xB7) \
-	X(X86_2B_POPCNT,   0xB8) \
-	X(X86_2B_BTCRM,    0xBB) \
-	X(X86_2B_BSF,      0xBC) \
-	X(X86_2B_BSR,      0xBD) \
-	X(X86_2B_MOVSX8,   0xBE) \
-	X(X86_2B_MOVSXW,   0xBF) \
-	X(X86_2B_XADDRM8,  0xC0) \
-	X(X86_2B_XADDRMW,  0xC1) \
+	X(X86_2B_NOP,       0x0D) /* Variable length NOP (3-9 with prefix) */ \
+	X(X86_2B_HINTS1,    0x18) /* Prefetch and hint-nop block 1/8 */ \
+	X(X86_2B_HINTS2,    0x19) /* Prefetch and hint-nop block 2/8 */ \
+	X(X86_2B_HINTS3,    0x1A) /* Prefetch and hint-nop block 3/8 */ \
+	X(X86_2B_HINTS4,    0x1B) /* Prefetch and hint-nop block 4/8 */ \
+	X(X86_2B_HINTS5,    0x1C) /* Prefetch and hint-nop block 5/8 */ \
+	X(X86_2B_HINTS6,    0x1D) /* Prefetch and hint-nop block 6/8 */ \
+	X(X86_2B_HINTS7,    0x1E) /* Prefetch and hint-nop block 7/8 */ \
+	X(X86_2B_HINTS8,    0x1F) /* Prefetch and hint-nop block 8/8 */ \
+	X(X86_2B_CMOVO,     0x40) \
+	X(X86_2B_CMOVNO,    0x41) \
+	X(X86_2B_CMOVB,     0x42) /* AKA CMOVC */ \
+	X(X86_2B_CMOVNB,    0x43) /* AKA CMOVNC */ \
+	X(X86_2B_CMOVZ,     0x44) /* AKA CMOVE */ \
+	X(X86_2B_CMOVNZ,    0x45) /* AKA CMOVNE */ \
+	X(X86_2B_CMOVNA,    0x46) /* AKA CMOVBE */ \
+	X(X86_2B_CMOVA,     0x47) /* AKA CMOVNBE */ \
+	X(X86_2B_CMOVS,     0x48) \
+	X(X86_2B_CMOVNS,    0x49) \
+	X(X86_2B_CMOVP,     0x4A) \
+	X(X86_2B_CMOVNP,    0x4B) \
+	X(X86_2B_CMOVL,     0x4C) /* AKA CMOVNGE */ \
+	X(X86_2B_CMOVNL,    0x4D) /* AKA CMOVGE */ \
+	X(X86_2B_CMOVNG,    0x4E) /* AKA CMOVLE */ \
+	X(X86_2B_CMOVG,     0x4F) /* AKA CMOVNLE */ \
+	X(X86_2B_SSE_XORPS, 0x57) \
+	X(X86_2B_SETO,      0x90) \
+	X(X86_2B_SETNO,     0x91) \
+	X(X86_2B_SETB,      0x92) /* AKA SETC */ \
+	X(X86_2B_SETNB,     0x93) /* AKA SETNC */ \
+	X(X86_2B_SETZ,      0x94) /* AKA SETE */ \
+	X(X86_2B_SETNZ,     0x95) /* AKA SETNZ */ \
+	X(X86_2B_SETNA,     0x96) /* AKA SETBE */ \
+	X(X86_2B_SETA,      0x97) /* AKA SETNBE */ \
+	X(X86_2B_SETS,      0x98) \
+	X(X86_2B_SETNS,     0x99) \
+	X(X86_2B_SETP,      0x9A) \
+	X(X86_2B_SETNP,     0x9B) \
+	X(X86_2B_SETL,      0x9C) /* AKA SETNGE */ \
+	X(X86_2B_SETNL,     0x9D) /* AKA SETGE */ \
+	X(X86_2B_SETNG,     0x9E) /* AKA SETLE */ \
+	X(X86_2B_SETG,      0x9F) /* AKA SETNLE */ \
+	X(X86_2B_BTMR,      0xA3) \
+	X(X86_2B_SHLDMRCL,  0xA5) \
+	X(X86_2B_BTS,       0xAB) \
+	X(X86_2B_SHRDMRCL,  0xAD) \
+	X(X86_2B_MISC,      0xAE) /* Float env stuff, memory fences */ \
+	X(X86_2B_IMUL,      0xAF) \
+	X(X86_2B_CMPXCHG8,  0xB0) \
+	X(X86_2B_CMPXCHGW,  0xB1) \
+	X(X86_2B_MOVZX8,    0xB6) \
+	X(X86_2B_MOVZXW,    0xB7) \
+	X(X86_2B_POPCNT,    0xB8) \
+	X(X86_2B_BTCRM,     0xBB) \
+	X(X86_2B_BSF,       0xBC) \
+	X(X86_2B_BSR,       0xBD) \
+	X(X86_2B_MOVSX8,    0xBE) \
+	X(X86_2B_MOVSXW,    0xBF) \
+	X(X86_2B_XADDRM8,   0xC0) \
+	X(X86_2B_XADDRMW,   0xC1) \
 	/* NOTE: this one is actually a block with some VMX stuff too; it's only
 	   CMPXCHG64 (CMPXCHG8B if you prefer) if MRM.reg = 1, but naming it this
 	   way seemed more useful since it's what you'll see in normal userspace
