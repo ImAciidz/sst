@@ -1,5 +1,6 @@
 /*
  * Copyright © 2024 Michael Smith <mikesmiffy128@gmail.com>
+ * Copyright © 2023 Willian Henrique <wsimanbrazil@yahoo.com.br>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -46,6 +47,10 @@ static struct rgba colours[3] = {
 
 static void colourcb(struct con_var *v) {
 	// this is stupid and ugly and has no friends, too bad!
+	// don't allow alpha changes
+	char newcolour[8] = {0,0,0,0,0,0,'F','F'};
+	if (v->strlen >= 6)
+		memcpy(newcolour, con_getvarstr(v), 6);
 	if (v == sst_portal_colour0) {
 		hexcolour_rgb(colours[0].bytes, con_getvarstr(v));
 	}
