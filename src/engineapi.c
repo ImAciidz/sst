@@ -109,4 +109,33 @@ bool engineapi_init(int pluginver) {
 	return true;
 }
 
+void rgba_hexparse(uchar out[static 4], const char *s) {
+	const char *p = s;
+	for (uchar *q = out; q - out < 4; ++q) {
+		if (*p >= '0' && *p <= '9') {
+			*q = *p++ - '0' << 4;
+		}
+		else if ((*p | 32) >= 'a' && (*p | 32) <= 'f') {
+			*q = 10 + (*p++ | 32) - 'a' << 4;
+		}
+		else {
+			// screw it, just fall back on white, I guess.
+			// note: this also handles *p == '\0' so we don't overrun the string
+			memset(out, 255, 4);
+			return;
+		}
+		// repetitive unrolled nonsense
+		if (*p >= '0' && *p <= '9') {
+			*q |= *p++ - '0';
+		}
+		else if ((*p | 32) >= 'a' && (*p | 32) <= 'f') {
+			*q |= 10 + (*p++ | 32) - 'a';
+		}
+		else {
+			memset(out, 255, 4);
+			return;
+		}
+	}
+}
+
 // vi: sw=4 ts=4 noet tw=80 cc=80

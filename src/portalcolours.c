@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Michael Smith <mikesmiffy128@gmail.com>
+ * Copyright © 2023 Willian Henrique <wsimanbrazil@yahoo.com.br>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,46 +44,20 @@ DEF_CVAR(sst_portal_colour2, "Crosshair colour for right portal (hex)",
 static struct rgba colours[3] = {
 		{242, 202, 167, 255}, {64, 160, 255, 255}, {255, 160, 32, 255}};
 
-static void hexparse(uchar out[static 4], const char *s) {
-	const char *p = s;
-	for (uchar *q = out; q - out < 3; ++q) {
-		if (*p >= '0' && *p <= '9') {
-			*q = *p++ - '0' << 4;
-		}
-		else if ((*p | 32) >= 'a' && (*p | 32) <= 'f') {
-			*q = 10 + (*p++ | 32) - 'a' << 4;
-		}
-		else {
-			// screw it, just fall back on white, I guess.
-			// note: this also handles *p == '\0' so we don't overrun the string
-			memset(out, 255, 4); // write 4 rather than 3, prolly faster?
-			return;
-		}
-		// repetitive unrolled nonsense
-		if (*p >= '0' && *p <= '9') {
-			*q |= *p++ - '0';
-		}
-		else if ((*p | 32) >= 'a' && (*p | 32) <= 'f') {
-			*q |= 10 + (*p++ | 32) - 'a';
-		}
-		else {
-			memset(out, 255, 4);
-			return;
-		}
-	}
-	//out[3] = 255; // never changes!
-}
-
 static void colourcb(struct con_var *v) {
 	// this is stupid and ugly and has no friends, too bad!
+	// don't allow alpha changes
+	char newcolour[8] = {0,0,0,0,0,0,'F','F'};
+	if (v->strlen >= 6)
+		memcpy(newcolour, con_getvarstr(v), 6);
 	if (v == sst_portal_colour0) {
-		hexparse(colours[0].bytes, con_getvarstr(v));
+		rgba_hexparse(colours[0].bytes, newcolour);
 	}
 	else if (v == sst_portal_colour1) {
-		hexparse(colours[1].bytes, con_getvarstr(v));
+		rgba_hexparse(colours[1].bytes, newcolour);
 	}
 	else /* sst_portal_colour2 */ {
-		hexparse(colours[2].bytes, con_getvarstr(v));
+		rgba_hexparse(colours[2].bytes, newcolour);
 	}
 }
 

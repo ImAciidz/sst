@@ -18,7 +18,7 @@ mkdir -p .build/include
 : "${HOSTCC:=clang -fuse-ld=lld}"
 
 warnings="-Wall -pedantic -Wno-parentheses -Wno-missing-braces \
--Wno-gnu-zero-variadic-macro-arguments"
+-Wno-gnu-zero-variadic-macro-arguments -Wno-strict-prototypes"
 
 dbg=0
 if [ "$dbg" = 1 ]; then

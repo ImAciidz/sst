@@ -1,5 +1,6 @@
 /*
  * Copyright © 2023 Michael Smith <mikesmiffy128@gmail.com>
+ * Copyright © 2023 Willian Henrique <wsimanbrazil@yahoo.com.br>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -135,6 +136,9 @@ extern struct VEngineClient *engclient;
 extern struct VEngineServer *engserver;
 extern void *globalvars;
 extern void *inputsystem, *vgui;
+
+// parses a hex string into a colour
+void rgba_hexparse(uchar out[static 4], const char *s);
 
 /*
  * Called on plugin init to attempt to initialise various core interfaces.
