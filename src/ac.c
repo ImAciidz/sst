@@ -87,7 +87,7 @@ static ulong __stdcall inhookthrmain(void *param) {
 static WNDPROC orig_wndproc;
 static ssize __stdcall hook_wndproc(void *wnd, uint msg, UINT_PTR wp, ssize lp) {
 	if (msg == WM_COPYDATA && lockdown) return DefWindowProcW(wnd, msg, wp, lp);
-	return orig_wndproc(wnd, msg, wp, lp);
+	return CallWindowProcW(orig_wndproc, wnd, msg, wp, lp);
 }
 
 static bool win32_init(void) {
@@ -108,6 +108,7 @@ static bool win32_init(void) {
 
 static void win32_end(void) {
 	// no error handling here because we'd crash either way. good luck!
+	// XXX: this should be SetWindowLongPtrW maybe?
 	SetWindowLongW(gamewin, GWLP_WNDPROC, (ssize)orig_wndproc);
 }
 
