@@ -79,6 +79,7 @@ setlocal DisableDelayedExpansion
 :+ l4dmm.c
 :+ l4dreset.c
 :+ l4dwarp.c
+:+ multipleinstance.c
 :+ nomute.c
 :+ nosleep.c
 :+ portalcolours.c
