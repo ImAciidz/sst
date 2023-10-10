@@ -156,6 +156,12 @@ e:;
 	// absolutely necessary, people can use it. If it doesn't work, or some
 	// other workaround is found, this might get reverted.
 	chcmdflags("cl_fullupdate", CON_CHEAT, 0);
+
+	// Remove cheat flag and add demo flag for OG Campaigns infinite votes CE.
+	// Also added FCVAR_NOTIFY in the off chance it stops anyone from
+	// accidentally screwing themselves over if they change it and forget but
+	// happen to see the chat message or something lol
+	chflags("sv_vote_creation_timer", CON_CHEAT, CON_DEMO | CON_NOTIFY);
 }
 
 static void l4d1specific(void) {
