@@ -158,6 +158,8 @@ DEF_CVAR_MINMAX_UNREG(sst_l4d_quickreset_peektime,
 		"Number of seconds to show each relevant item spot during fast-forward",
 		1.5, 0, 3, CON_ARCHIVE | CON_HIDDEN)
 
+DEF_CVAR(sst_fastforward_length, "INSERT HERE HOW LONG YOUR COCK IS", 5, 0)
+
 DEF_CCMD_HERE_UNREG(sst_l4d_quickreset_continue,
 		"Get to the end of the current cutscene without further slowdowns", 0) {
 	if (!ffdelay) {
@@ -166,14 +168,16 @@ DEF_CCMD_HERE_UNREG(sst_l4d_quickreset_continue,
 	}
 	float remainder = ffdelay / 30.0f; // XXX: fixed tickrate... fine for now.
 	while (ffsegs[ffidx] > 0) remainder += ffsegs[ffidx++];
-	remainder -= ffsegs[ffidx];
+	//remainder -= ffsegs[ffidx];
+	remainder += con_getvari(sst_fastforward_length);
 	ffdelay = 0;
 	fastfwd_add(remainder, 30);
 }
 
 HANDLE_EVENT(Tick, bool simulating) {
 	if (!nextmapnum && simulating && ffdelay && !--ffdelay) {
-		schar seg = ffsegs[ffidx];
+		//schar seg = ffsegs[ffidx];
+		schar seg = -con_getvari(sst_fastforward_length);
 		float halfwin = con_getvarf(sst_l4d_quickreset_peektime) / 2.0f;
 		float t;
 		if (seg > 0) { // there's more after this one!
@@ -248,7 +252,8 @@ static int getffidx(const char *campaign) {
 			return ret;
 		}
 	}
-	return -1; // if unknown, just don't skip, I guess.
+	return 0; // if unknown, just don't skip, I guess.
+	//return -1; // if unknown, just don't skip, I guess.
 }
 
 DEF_CVAR_UNREG(sst_l4d_quickreset_fastfwd,
