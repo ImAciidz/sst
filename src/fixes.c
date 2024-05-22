@@ -210,11 +210,31 @@ static void portal1specific(void) {
 #endif
 }
 
+static void portal2specific(void) {
+	// Unhiding these commands allows people to choose to make the loading
+	// screens less pointlessly long.
+	unhide("ui_loadingscreen_fadein_time");
+	unhide("ui_loadingscreen_mintransition_time");
+	unhide("ui_loadingscreen_transition_time");
+
+	// TODO: Figure out precisely what the frick SAR is doing
+	chcmdflags("soundfade", 0, CON_CCMDEXEC);
+	chcmdflags("leaderboard_open", 0, CON_CCMDEXEC | CON_SRVEXEC);
+	chcmdflags("gameui_activate", 0, CON_SRVEXEC);
+	chcmdflags("gameui_allowescape", 0, CON_SRVEXEC);
+	chcmdflags("gameui_preventescape", 0, CON_SRVEXEC);
+	chcmdflags("setpause", 0, CON_SRVEXEC);
+	chcmdflags("hud_subtitles", 0, CON_CCMDEXEC);
+	chcmdflags("disconnect", 0, CON_CCMDEXEC);
+	chflags("snd_ducktovolume", 0, CON_SRVEXEC);
+}
+
 void fixes_apply(void) {
 	generalfixes();
 	if (GAMETYPE_MATCHES(L4D1)) l4d1specific();
 	else if (GAMETYPE_MATCHES(L4D2x)) l4d2specific();
 	else if (GAMETYPE_MATCHES(Portal1)) portal1specific();
+	else if (GAMETYPE_MATCHES(Portal2)) portal2specific();
 }
 
 // vi: sw=4 ts=4 noet tw=80 cc=80
