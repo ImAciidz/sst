@@ -295,7 +295,7 @@ static int getffidx(const char *campaign) {
 		if (!strcmp(campaign, "darkblood2")) return FFIDX_DARKBLOOD2;
 		if (!strcmp(campaign, "Greyscale")) return FFIDX_GREYSCALE;
 		if (!strcmp(campaign, "yomimario2")) return FFIDX_MARIO;
-		if (!strcmp(campaign, "ravenholmwarmission2")) return FFIDX_RAVENHOLM;
+		if (!strcmp(campaign, "ravenholmwar2")) return FFIDX_RAVENHOLM;
 		if (!strcmp(campaign, "warcelona")) return FFIDX_WARCELONA;
 		if (!strcmp(campaign, "tot")) return FFIDX_TOUR;
 		if (!strcmp(campaign, "damitcomplete")) return FFIDX_DAMIT;
