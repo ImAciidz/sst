@@ -28,6 +28,7 @@
 #include "vcall.h"
 #include "x86.h"
 #include "x86util.h"
+#include "hexcolour.h"
 
 FEATURE("input hud")
 REQUIRE_GAMEDATA(vtidx_CreateMove)
@@ -51,7 +52,7 @@ static union {
 	DecodeUserCmdFromBuffer_L4Dbased_func L4Dbased;
 } orig_DecodeUserCmdFromBuffer;
 static void *input = 0;
-static struct hfont font;
+ulong font;
 static int buttons;
 
 struct key {
@@ -66,7 +67,7 @@ struct key {
 static struct rgba unpressed = {0, 0, 0, 92};
 static struct rgba pressed = {255, 255, 255, 200};
 // default layout
-static struct key layouts[1][10] = {
+static struct key layouts[2][10] = {
 	{
 		{0, 0, 1, 1, L'C', IN_DUCK},
 		{1, 0, 3, 1, L'J', IN_JUMP},
@@ -77,6 +78,11 @@ static struct key layouts[1][10] = {
 		{3, 1, 1, 1, L'D', IN_MOVERIGHT},
 		{2, 2, 1, 1, L'W', IN_FORWARD},
 		{3, 2, 1, 1, L'E', IN_USE},
+		{0, 0, 0, 0, 0, IN_NONE},
+	},
+	{
+		{0, 0, 3, 1, L'J', IN_JUMP},
+		{3, 0, 1, 1, L'E', IN_USE},
 		{0, 0, 0, 0, 0, IN_NONE},
 	},
 };
@@ -90,35 +96,46 @@ DEF_CVAR(sst_ihud_gap, "IHud key gap (pixels)", 5, CON_ARCHIVE | CON_HIDDEN)
 DEF_CVAR(sst_ihud_keysize, "IHud key size (pixels)", 60, CON_ARCHIVE | CON_HIDDEN)
 DEF_CVAR(sst_ihud_x, "IHud x position", 0, CON_ARCHIVE | CON_HIDDEN)
 DEF_CVAR(sst_ihud_y, "IHud y position", 0, CON_ARCHIVE | CON_HIDDEN)
+DEF_CVAR(sst_ihud_font, "Input HUD font", "Default", CON_ARCHIVE | CON_HIDDEN)
+DEF_CVAR_MINMAX(sst_ihud_layout, "0 = full, 1 = simplified", 0, 0, 1,
+					CON_ARCHIVE | CON_HIDDEN)
 
 // portalcolours.c:48
 static void colourcb(struct con_var *v) {
 	// this is stupid and ugly and has no friends, too bad!
 	if (v == sst_ihud_colour_normal) {
-		rgba_hexparse(unpressed.bytes, con_getvarstr(v));
+		hexcolour_rgba(unpressed.bytes, con_getvarstr(v));
 	}
 	else if (v == sst_ihud_colour_pressed) {
-		rgba_hexparse(pressed.bytes, con_getvarstr(v));
+		hexcolour_rgba(pressed.bytes, con_getvarstr(v));
 	}
 }
 
-HANDLE_EVENT(HudPaint) {
+static void fontcb(struct con_var *v){
+	font = hud_getfont(con_getvarstr(sst_ihud_font), true);
+}
+
+//static void layoutcb(struct con_var *v){
+//	
+//}
+
+HANDLE_EVENT(HudPaint, void) {
 	int w, h;
 	if (!con_getvari(sst_ihud)) return;
-	hud_getscreensize(&w, &h);
+	hud_screensize(&w, &h);
 	int gap = con_getvari(sst_ihud_gap);
 	int size = con_getvari(sst_ihud_keysize);
 	int xoffset = con_getvari(sst_ihud_x);
 	int yoffset = con_getvari(sst_ihud_y);
-	for (struct key *k = layouts[0]; k->button; k++) {
+	for (struct key *k = layouts[con_getvari(sst_ihud_layout)]; k->button; k++) {
 		struct rgba colour = buttons & k->button ? pressed : unpressed;
 		int x0 = xoffset + size * k->x + gap * (k->x+1);
 		int y0 = -yoffset + h - size * (k->y+1) - gap * (k->y+1);
 		int x1 = x0 + size * k->w + gap * (k->w-1);
 		int y1 = y0 + size * k->h + gap * (k->h-1);
 		hud_drawrect(x0, y0, x1, y1, colour, true);
-		int tx = x1 - (x1 - x0) / 2 - hud_getcharwidth(font, k->ch) / 2;
-		int ty = y1 - (y1 - y0) / 2 - hud_getfonttall(font) / 2;
+		int tx = x1 - (x1 - x0) / 2 - hud_charwidth(font, k->ch) / 2;
+		int ty = y1 - (y1 - y0) / 2 - hud_fontheight(font) / 2;
 		hud_drawtext(font, tx, ty, (struct rgba){255, 255, 255, 255},
 				&k->ch, 1);
 	};
@@ -190,9 +207,9 @@ INIT {
 		errmsg_errorsys("couldn't make virtual table writable");
 		return false;
 	}
-	font = hud_createfont("Consolas", 18, 600, 0, 0, FONTFLAG_OUTLINE);
-	if (!font.handle) {
-		errmsg_errorx("couldn't create font");
+	font = hud_getfont(con_getvarstr(sst_ihud_font), true);
+	if (!font) {
+		errmsg_errorx("couldn't get font");
 		return false;
 	}
 	orig_CreateMove = (CreateMove_func)hook_vtable(vtable, vtidx_CreateMove,
@@ -219,6 +236,9 @@ INIT {
 	sst_ihud_colour_normal->cb = &colourcb;
 	sst_ihud_x->base.flags &= ~CON_HIDDEN;
 	sst_ihud_y->base.flags &= ~CON_HIDDEN;
+	sst_ihud_font->base.flags &= ~CON_HIDDEN;
+	sst_ihud_font->cb = &fontcb;
+	sst_ihud_layout->base.flags &= ~CON_HIDDEN;
 	return true;
 }
 

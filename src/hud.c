@@ -176,11 +176,11 @@ INIT {
 		errmsg_errorsys("couldn't make virtual table writable");
 		return false;
 	}
-	orig_Paint = (Paint_func)hook_vtable(toolspanelvt, vtidx_Paint,
+	orig_Paint = (Paint_func)hook_vtable(vtable, vtidx_Paint,
 			(void *)&hook_Paint);
 	SetPaintEnabled(toolspanel, true);
 	// 1 is the default, first loaded scheme. should always be sourcescheme.res
-	scheme = GetIScheme(schememgr, (struct handlewrap){1});
+	scheme = GetIScheme(schememgr, (struct handlewrap){2});
 	return true;
 }
 
