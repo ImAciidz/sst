@@ -81,8 +81,9 @@ static struct key layouts[2][10] = {
 		{0, 0, 0, 0, 0, IN_NONE},
 	},
 	{
-		{0, 0, 3, 1, L'J', IN_JUMP},
-		{3, 0, 1, 1, L'E', IN_USE},
+		{0, 0, 1, 1, L'C', IN_DUCK},
+		{1, 0, 3, 1, L'J', IN_JUMP},
+		{4, 0, 1, 1, L'E', IN_USE},
 		{0, 0, 0, 0, 0, IN_NONE},
 	},
 };
