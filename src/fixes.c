@@ -216,6 +216,7 @@ static void portal2specific(void) {
 	unhide("ui_loadingscreen_fadein_time");
 	unhide("ui_loadingscreen_mintransition_time");
 	unhide("ui_loadingscreen_transition_time");
+	unhide("ui_transition_effect");
 
 	// TODO: Figure out precisely what the frick SAR is doing
 	chcmdflags("soundfade", 0, CON_CCMDEXEC);
