@@ -98,6 +98,7 @@ setlocal DisableDelayedExpansion
 :+ rinput.c
 :+ sst.c
 :+ trace.c
+:+ velometer.c
 :+ xhair.c
 :+ x86.c
 :: just tack these on, whatever (repeated condition because of expansion memes)
