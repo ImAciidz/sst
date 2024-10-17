@@ -97,7 +97,6 @@ static inline bool find_FSMAFAS(void) {
 	return false;
 }
 
-static struct con_cmd *cmd_show_addon_metadata;
 static con_cmdcb orig_show_addon_metadata_cb;
 
 static inline bool find_addonvecsz(void) {
@@ -113,18 +112,43 @@ static inline bool find_addonvecsz(void) {
 	return false;
 }
 
-static bool larger_jmp_insn = false;
 static void *broken_addon_check;
+static u8 orig_broken_addon_check_bytes[13];
+static bool has_broken_addon_check = false;
+
+static inline void fix_broken_addon_check(bool larger_jmp_insn) {
+	const u8 nop[] = 
+		HEXBYTES(66, 0F, 1F, 84, 00, 00, 00, 00, 00, 0F, 1F, 40, 00);
+	memcpy(orig_broken_addon_check_bytes, broken_addon_check, 13);
+	if (larger_jmp_insn) {
+		if_hot(os_mprot(broken_addon_check, 13, PAGE_EXECUTE_READWRITE)) {
+			memcpy(broken_addon_check, nop, 13);
+		} else {
+			errmsg_warnsys("unable to fix broken addon check: "
+					"couldn't make make memory writable");
+		}
+	} else {
+		if_hot(os_mprot(broken_addon_check, 9, PAGE_EXECUTE_READWRITE)) {
+			memcpy(broken_addon_check, nop, 9);
+		} else {
+			errmsg_warnsys("unable to fix broken addon check: "
+					"couldn't make make memory writable");
+		}
+	}
+}
 
 static inline bool find_broken_addon_check(void) {
 	uchar *insns = (uchar *)orig_FSMAFAS;
 	for (uchar *p = insns; p - insns < 32;) {
 		if (p[0] == X86_ALUMI8S && p[1] == X86_MODRM(0, 7, 5) &&
 				mem_loadptr(p + 2) == addonvecsz) {
-			if (p[7] == X86_2BYTE) {
-				larger_jmp_insn = true;
-			}
 			broken_addon_check = p;
+			has_broken_addon_check = true;
+			if (p[7] == X86_2BYTE) {
+				fix_broken_addon_check(true);
+			} else {
+				fix_broken_addon_check(false);
+			}
 			return true;
 		}
 		NEXT_INSN(p, "broken addon check");
@@ -132,12 +156,12 @@ static inline bool find_broken_addon_check(void) {
 	return false;
 }
 
-static bool has_broken_addon_check = false;
-static u8 orig_broken_addon_check_bytes[13];
+PREINIT {
+	return GAMETYPE_MATCHES(L4D2_2147plus);
+}
 
 INIT {
-    if_cold (!GAMETYPE_MATCHES(L4D2_2147plus)) return false;
-    cmd_show_addon_metadata = con_findcmd("show_addon_metadata");
+    struct con_cmd *cmd_show_addon_metadata = con_findcmd("show_addon_metadata");
     if_cold (!cmd_show_addon_metadata) return false;
 	orig_show_addon_metadata_cb = con_getcmdcb(cmd_show_addon_metadata);
 	if_cold (!find_FSMAFAS()) {
@@ -148,41 +172,16 @@ INIT {
 		errmsg_errorx("couldn't find addon metadata counter");
 		return false;
 	}
-	if_cold (find_broken_addon_check()) {
-		const u8 nop[] = 
-			HEXBYTES(66, 0F, 1F, 84, 00, 00, 00, 00, 00, 0F, 1F, 40, 00);
-	    if (larger_jmp_insn) {
-	    	memcpy(orig_broken_addon_check_bytes, broken_addon_check, 13);
-	    	if_hot(os_mprot(broken_addon_check, 13, PAGE_EXECUTE_READWRITE)) {
-	    		memcpy(broken_addon_check, nop, 13);
-	    	} else {
-	    		errmsg_warnsys("unable to fix broken addon check: "
-						"couldn't make make memory writable");
-	    	}
-	    } else {
-	    	memcpy(orig_broken_addon_check_bytes, broken_addon_check, 9);
-	    	if_hot(os_mprot(broken_addon_check, 9, PAGE_EXECUTE_READWRITE)) {
-	    		memcpy(broken_addon_check, nop, 9);
-	    	} else {
-	    		errmsg_warnsys("unable to fix broken addon check: "
-						"couldn't make make memory writable");
-	    	}
-	    }
-		has_broken_addon_check = true;
-    } else { 
-        errmsg_errorx("couldn't find broken addon check");
-	}
+	find_broken_addon_check();
 	orig_FSMAFAS = (FSMAFAS_func)hook_inline( (void *)orig_FSMAFAS, 
 			(void *)&hook_FSMAFAS);
     return true;
 }
 
 END {
-	if_cold (sst_userunloaded && has_broken_addon_check) {
-		if (larger_jmp_insn) {
+	if_cold (sst_userunloaded) {
+		if (has_broken_addon_check) {
 			memcpy(broken_addon_check, orig_broken_addon_check_bytes, 13);
-		} else {
-			memcpy(broken_addon_check, orig_broken_addon_check_bytes, 9);
 		}
 	}
 	unhook_inline((void *)orig_FSMAFAS);
