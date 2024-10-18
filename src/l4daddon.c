@@ -47,42 +47,37 @@ static void hook_FSMAFAS(bool p1, char *p2, char *p3, bool p4) {
 	// p2: campaign/mission
 	// p3: gamemode
 	// p4: is cur mode a mutation
-	// note: the 4th parameter was added in 2204 (Oct 21st 2020), FSMAFAS only
-	// has 3 parameters, but we don't have to worry about that since it's cdecl
-	con_msg("======================\n");
-	con_msg("testicles\n");
-	con_msg("last_mission %s\n", last_mission);
-	con_msg("last_gamemode %s\n", last_gamemode);
-	con_msg("the old number of addons: %u\n", old_addonvecsz);
-	if (*addonvecsz > 0) {
-		old_addonvecsz = *addonvecsz;
-		if (p2 && p3) {
-			if ((strcmp(p2, last_mission)) || strcmp(p3, last_gamemode)) {
-				con_msg("\ncalling original function (p2/p3 are not null, one of them changed)\n\n");
-				orig_FSMAFAS(p1, p2, p3, p4);
-			}
-			strcpy(last_mission, p2);
-			strcpy(last_gamemode, p3);
-		} else {
-			con_msg("\ncalling FSMAFAS (p2 and/or p3 are null)\n\n");
-			strcpy(last_mission, "");
-			strcpy(last_gamemode, "");
-			orig_FSMAFAS(p1, p2, p3, p4);
-		}
-	} else if (old_addonvecsz > 0) {
-		old_addonvecsz = *addonvecsz;
-		con_msg("\ncalling FSMAFAS\n\n");
-		orig_FSMAFAS(p1, p2, p3, p4);
-	} else {
-		con_msg("\ndid not call FSMAFAS, addons are disabled and they were not just disabled a moment ago\n\n");
-	}
+	// note: the 4th parameter was first added in 2204 (Oct 21st 2020), but we
+	// don't have to worry about that since it's cdecl
+	// assumptions: addons and mode config for addon blocking (e.g. versus)
+    // aren't being changed mid-campaign
 
-	con_msg("isAddonsDisallowedInMode: %u\n", p1);
-	con_msg("mission: %s\n", p2);
-	con_msg("mode: %s\n", p3);
-	con_msg("isMutation: %u\n", p4);
-	con_msg("the number of addons thing idk: %u\n", *addonvecsz);
-	con_msg("======================\n");
+    int curaddonvecsz = *addonvecsz;
+    // addons changed, which means we are in the main menu, another call to FSMAFAS
+    // with null p2 and p3 already happened and our "last_" variables have been
+    // cleared already. update the addon count and run original function
+    if (curaddonvecsz != old_addonvecsz) {
+        old_addonvecsz = curaddonvecsz;
+        goto hook_end;
+    }
+
+    // addons didn't change and no addons are enabled: do nothing
+    if (!curaddonvecsz) return;
+
+    // cache campaign and mode names and, if we were given a campaign and a mode
+    // name, try to early exit
+    if (p2 && p3) {
+        bool earlyret = !strcmp(p2, last_mission) && !strcmp(p3, last_gamemode);
+        strcpy(last_mission, p2);
+        strcpy(last_gamemode, p3);
+        if (earlyret) return;
+    }
+    else {
+        last_mission[0] = '\0';
+        last_gamemode[0] = '\0';
+    }
+hook_end:
+    orig_FSMAFAS(p1, p2, p3, p4);
 }
 
 DECL_VFUNC(void, CEC_MAFAS, 179) // CEngineClient::ManageAddonsForActiveSession
@@ -141,7 +136,8 @@ static inline void nop_addon_check(bool larger_jmp_insn) {
 	int nop_size = larger_jmp_insn ? 13 : 9;
 	if_hot(os_mprot(broken_addon_check, nop_size, PAGE_EXECUTE_READWRITE)) {
 		memcpy(broken_addon_check, nop, nop_size);
-	} else {
+	}
+	else {
 		errmsg_warnsys("unable to fix broken addon check: "
 				"couldn't make make memory writable");
 	}
@@ -154,10 +150,16 @@ static inline void try_fix_broken_addon_check(void) {
 				mem_loadptr(p + 2) == addonvecsz) {
 			broken_addon_check = p;
 			has_broken_addon_check = true;
-			fix_broken_addon_check(p[7] == X86_2BYTE);
+			nop_addon_check(p[7] == X86_2BYTE);
 			return;
 		}
-		NEXT_INSN(p, "broken addon check");
+		int _len = x86_len(p);
+		if_cold(_len == -1) {
+			errmsg_errorx("unknown or invalid instruction looking for broken "
+				"addon check");
+			return;
+		}
+		p += _len;
 	}
 	return;
 }
