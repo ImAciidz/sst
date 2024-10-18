@@ -50,34 +50,34 @@ static void hook_FSMAFAS(bool p1, char *p2, char *p3, bool p4) {
 	// note: the 4th parameter was first added in 2204 (Oct 21st 2020), but we
 	// don't have to worry about that since it's cdecl
 	// assumptions: addons and mode config for addon blocking (e.g. versus)
-    // aren't being changed mid-campaign
+	// aren't being changed mid-campaign
 
-    int curaddonvecsz = *addonvecsz;
-    // addons changed, which means we are in the main menu, another call to FSMAFAS
-    // with null p2 and p3 already happened and our "last_" variables have been
-    // cleared already. update the addon count and run original function
-    if (curaddonvecsz != old_addonvecsz) {
-        old_addonvecsz = curaddonvecsz;
-        goto hook_end;
-    }
+	int curaddonvecsz = *addonvecsz;
+	// addons changed, which means we are in the main menu, another call to FSMAFAS
+	// with null p2 and p3 already happened and our "last_" variables have been
+	// cleared already. update the addon count and run original function
+	if (curaddonvecsz != old_addonvecsz) {
+		old_addonvecsz = curaddonvecsz;
+		goto hook_end;
+	}
 
-    // addons didn't change and no addons are enabled: do nothing
-    if (!curaddonvecsz) return;
+	// addons didn't change and no addons are enabled: do nothing
+	if (!curaddonvecsz) return;
 
-    // cache campaign and mode names and, if we were given a campaign and a mode
-    // name, try to early exit
-    if (p2 && p3) {
-        bool earlyret = !strcmp(p2, last_mission) && !strcmp(p3, last_gamemode);
-        strcpy(last_mission, p2);
-        strcpy(last_gamemode, p3);
-        if (earlyret) return;
-    }
-    else {
-        last_mission[0] = '\0';
-        last_gamemode[0] = '\0';
-    }
+	// cache campaign and mode names and, if we were given a campaign and a mode
+	// name, try to early exit
+	if (p2 && p3) {
+		bool earlyret = !strcmp(p2, last_mission) && !strcmp(p3, last_gamemode);
+		strcpy(last_mission, p2);
+		strcpy(last_gamemode, p3);
+		if (earlyret) return;
+	}
+	else {
+		last_mission[0] = '\0';
+		last_gamemode[0] = '\0';
+	}
 hook_end:
-    orig_FSMAFAS(p1, p2, p3, p4);
+	orig_FSMAFAS(p1, p2, p3, p4);
 }
 
 DECL_VFUNC(void, CEC_MAFAS, 179) // CEngineClient::ManageAddonsForActiveSession
@@ -116,21 +116,21 @@ static u8 orig_broken_addon_check_bytes[13];
 static bool has_broken_addon_check = false;
 
 static inline void nop_addon_check(bool larger_jmp_insn) {
-	// In versions prior to 2.2.0.4 (Oct 21st 2020), FSMAFAS checks if any 
-	// addons are enabled before doing anything else. If no addons are enabled, 
-	// then the function just returns immediately. FSMAFAS gets called by 
-	// update_addon_paths, and that gets called when you click 'Done' in the 
-	// addons menu. This is problematic because whatever addons you last 
+	// In versions prior to 2.2.0.4 (Oct 21st 2020), FSMAFAS checks if any
+	// addons are enabled before doing anything else. If no addons are enabled,
+	// then the function just returns immediately. FSMAFAS gets called by
+	// update_addon_paths, and that gets called when you click 'Done' in the
+	// addons menu. This is problematic because whatever addons you last
 	// disabled won't get properly disabled since the rest of FSMAFAS doesn't
 	// execute. If, for example, you only had a common infected retexture addon
 	// enabled, and you decided to disable it, your commons would be invisible
-	// until you either restarted the game or enabled another addon. 
+	// until you either restarted the game or enabled another addon.
 	// so, we simply NOP the relevant CMP and JZ instructions to get rid of this
-	// check, so that FSMAFAS always executes. Depending on the size of the JZ 
-	// instruction, we need to NOP either 9 bytes (e.g. 2.2.0.3) or 13 bytes 
-	// (e.g. 2.1.4.7). So, we always write a 9-byte NOP, and sometimes also 
+	// check, so that FSMAFAS always executes. Depending on the size of the JZ
+	// instruction, we need to NOP either 9 bytes (e.g. 2.2.0.3) or 13 bytes
+	// (e.g. 2.1.4.7). So, we always write a 9-byte NOP, and sometimes also
 	// write a 4-byte NOP afterwards.
-	const u8 nop[] = 
+	const u8 nop[] =
 		HEXBYTES(66, 0F, 1F, 84, 00, 00, 00, 00, 00, 0F, 1F, 40, 00);
 	memcpy(orig_broken_addon_check_bytes, broken_addon_check, 13);
 	int nop_size = larger_jmp_insn ? 13 : 9;
@@ -169,8 +169,8 @@ PREINIT {
 }
 
 INIT {
-    struct con_cmd *cmd_show_addon_metadata = con_findcmd("show_addon_metadata");
-    if_cold (!cmd_show_addon_metadata) return false;
+	struct con_cmd *cmd_show_addon_metadata = con_findcmd("show_addon_metadata");
+	if_cold (!cmd_show_addon_metadata) return false;
 	orig_show_addon_metadata_cb = con_getcmdcb(cmd_show_addon_metadata);
 	if_cold (!find_FSMAFAS()) {
 		errmsg_errorx("couldn't find FileSystem_ManageAddonsForActiveSession");
@@ -181,9 +181,9 @@ INIT {
 		return false;
 	}
 	try_fix_broken_addon_check();
-	orig_FSMAFAS = (FSMAFAS_func)hook_inline( (void *)orig_FSMAFAS, 
+	orig_FSMAFAS = (FSMAFAS_func)hook_inline( (void *)orig_FSMAFAS,
 			(void *)&hook_FSMAFAS);
-    return true;
+	return true;
 }
 
 END {
