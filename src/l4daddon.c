@@ -35,6 +35,8 @@
 FEATURE()
 REQUIRE_GLOBAL(engclient)
 
+// count of how many addon metadata entries there is - this is the m_Size member
+// of s_vecAddonMetaData (which is a CUtlVector<SAddOnMetaData>)
 static int *addonvecsz;
 static char last_mission[128] = {0};
 static char last_gamemode[128] = {0};
@@ -47,15 +49,46 @@ static void hook_FSMAFAS(bool p1, char *p2, char *p3, bool p4) {
 	// p2: campaign/mission
 	// p3: gamemode
 	// p4: is cur mode a mutation
-	// note: the 4th parameter was first added in 2204 (Oct 21st 2020), but we
-	// don't have to worry about that since it's cdecl
+	// note: the 4th parameter was first added in 2.2.0.4 (Oct 21st 2020), but
+	// we don't have to worry about that since it's cdecl
+	
+	// When you load into a level, most noticeably on versions 2.2.0.4 and
+	// beyond (check nop_addon_check() for context) and in campaigns with L4D1
+	// common infected, you get can get a ton of hitches caused by the game
+	// trying to load uncached materials as models are rendered. This function
+	// (FileSystem_ManageAddonsForActiveSession, FSMAFAS for short) is the
+	// primary cause of materials being uncached. When hosting a server, you get
+	// 2 calls to this function per map load: first by the server module calling
+	// CVEngineServer::MAFAS and then by the client module calling
+	// CEngineClient::MAFAS (non-hosts only get this call). Omitting the second
+	// call (for partially unknown reasons) fixes most hitches, but the work
+	// done by FSMAFAS can be omitted in a few more cases. The function tries to
+	// evaluate which addon vpks should be loaded in the FS based on the current
+	// gamemode, campaign and addon restrictions, adding and removing vpk's from
+	// the FS interface as necessary, and invalidates many caches (material,
+	// model and audio) to ensure proper reload of the assets when needed.
+	// Given that the enabled addons and parameters passed to this function
+	// change rarely, we can avoid unnecessary cache invalidation by checking
+	// the parameters passed to the function and if addons are enabled
+	// currently. Enabled addons and addon restrictions are not expected to
+	// change mid-campaign and resources can remain cached between maps of the
+	// same campaign and mode. Both the action of disconnecting from a server
+	// and using the addons menu call FSMAFAS to allow every enabled vpk to be
+	// loaded, so we let those calls go through. The only edge case not handled
+	// by this implementation is if you're a client reconnecting to the same
+	// server you were just on, and the server hasn't changed maps (it's unclear
+	// why hitches still occur in this case and would require further research
+	// on the cache states throughout loads). Finally, as a bonus, every call to
+	// FSMAFAS that we avoid saves about 1s on loads, so that's nice.
+	
 	// assumptions: addons and mode config for addon blocking (e.g. versus)
 	// aren't being changed mid-campaign
 
 	int curaddonvecsz = *addonvecsz;
-	// addons changed, which means we are in the main menu, another call to FSMAFAS
-	// with null p2 and p3 already happened and our "last_" variables have been
-	// cleared already. update the addon count and run original function
+	// addons changed, which means we are in the main menu, another call to
+	// FSMAFAS with null p2 and/or p3 already happened and our "last_" variables
+	// have been cleared already. update the addon count and run original
+	// function
 	if (curaddonvecsz != old_addonvecsz) {
 		old_addonvecsz = curaddonvecsz;
 		goto hook_end;
@@ -99,7 +132,7 @@ static con_cmdcb orig_show_addon_metadata_cb;
 
 static inline bool find_addonvecsz(void) {
 	const uchar *insns = (const uchar*)orig_show_addon_metadata_cb;
-	// show_addon_metadata immediately checks if s_vecAddonMetadata is 0,
+	// show_addon_metadata immediately checks if s_vecAddonMetadata.m_Size is 0,
 	// so we can just grab it from the CMP instruction
 	for (const uchar *p = insns; p - insns < 32;) {
 		if (p[0] == X86_ALUMI8S && p[1] == X86_MODRM(0, 7, 5) && p[6] == 0) {
@@ -125,8 +158,8 @@ static inline void nop_addon_check(bool larger_jmp_insn) {
 	// execute. If, for example, you only had a common infected retexture addon
 	// enabled, and you decided to disable it, your commons would be invisible
 	// until you either restarted the game or enabled another addon.
-	// so, we simply NOP the relevant CMP and JZ instructions to get rid of this
-	// check, so that FSMAFAS always executes. Depending on the size of the JZ
+	// We simply NOP the relevant CMP and JZ instructions to get rid of this
+	// check so that FSMAFAS always executes. Depending on the size of the JZ
 	// instruction, we need to NOP either 9 bytes (e.g. 2.2.0.3) or 13 bytes
 	// (e.g. 2.1.4.7). So, we always write a 9-byte NOP, and sometimes also
 	// write a 4-byte NOP afterwards.
