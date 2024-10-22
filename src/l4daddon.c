@@ -35,6 +35,14 @@
 FEATURE()
 REQUIRE_GLOBAL(engclient)
 
+// Keeping this here since it will be useful for Future Addon Feature Plans™
+/*struct SAddOnMetaData { // literal psychopath capitalization
+	char absolutePath;
+	char name;
+	int type; // (0 = content, 1 = mission, 2 = mode)
+	int unknown;
+};*/
+
 // count of how many addon metadata entries there is - this is the m_Size member
 // of s_vecAddonMetaData (which is a CUtlVector<SAddOnMetaData>)
 static int *addonvecsz;
@@ -42,16 +50,15 @@ static char last_mission[128] = {0};
 static char last_gamemode[128] = {0};
 static int old_addonvecsz;
 
+// note: the 4th parameter was first added in 2.2.0.4 (Oct 21st 2020), but
+// we don't have to worry about that since it's cdecl
 typedef void (*FSMAFAS_func)(bool, char *, char *, bool);
 static FSMAFAS_func orig_FSMAFAS;
+// p1: if addons are disallowed in this mode (versus, scav, etc)
+// p2: campaign/mission
+// p3: gamemode
+// p4: is cur mode a mutation
 static void hook_FSMAFAS(bool p1, char *p2, char *p3, bool p4) {
-	// p1: if addons are disallowed in this mode (versus, scav, etc)
-	// p2: campaign/mission
-	// p3: gamemode
-	// p4: is cur mode a mutation
-	// note: the 4th parameter was first added in 2.2.0.4 (Oct 21st 2020), but
-	// we don't have to worry about that since it's cdecl
-	
 	// When you load into a level, most noticeably on versions 2.2.0.4 and
 	// beyond (check nop_addon_check() for context) and in campaigns with L4D1
 	// common infected, you get can get a ton of hitches caused by the game
@@ -80,7 +87,7 @@ static void hook_FSMAFAS(bool p1, char *p2, char *p3, bool p4) {
 	// why hitches still occur in this case and would require further research
 	// on the cache states throughout loads). Finally, as a bonus, every call to
 	// FSMAFAS that we avoid saves about 1s on loads, so that's nice.
-	
+
 	// assumptions: addons and mode config for addon blocking (e.g. versus)
 	// aren't being changed mid-campaign
 
