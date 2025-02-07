@@ -2,6 +2,7 @@
  * Copyright © 2023 Matthew Wozniak <sirtomato999@gmail.com>
  * Copyright © 2024 Michael Smith <mikesmiffy128@gmail.com>
  * Copyright © 2023 Willian Henrique <wsimanbrazil@yahoo.com.br>
+ * Copyright © 2025 Hayden K <imaciidz@gmail.com>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -224,7 +225,7 @@ INIT {
 		errmsg_errorx("couldn't find FrameUpdate function");
 		return false;
 	}
-	if_cold (!(func = find_floatcall(func, GAMETYPE_MATCHES(L4D2_2147plus) ?
+	if_cold (!(func = find_floatcall(func, GAMETYPE_MATCHES(L4D2_2125plus) ?
 			2 : 1, "CHostState::State_Run"))) {
 		errmsg_errorx("couldn't find State_Run function");
 		return false;
