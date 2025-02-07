@@ -48,7 +48,8 @@ vtidx_GetGameDirectory
 	Client012 37 # dmomm, ep1, ...
 vtidx_GetEngineBuildNumber
 	Client013
-		L4D2 99
+		L4D 99
+			L4D1_1022plus 97
 		Portal2 100
 	Client014
 		L4D2 31
@@ -56,8 +57,6 @@ vtidx_GetEngineBuildNumber
 	Portal1_3420 91
 	# TODO(compat): we'll need these... but need to detect first
 	#Portal1_5135 102
-	#L4D1_1005 99
-	#L4D1_Steam 97
 
 # IGameUIFuncs
 vtidx_GetDesktopResolution 5
