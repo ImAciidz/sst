@@ -28,7 +28,6 @@
 #include "engineapi.h"
 #include "errmsg.h"
 #include "event.h"
-#include "fixes/confixes.h"
 #include "gamedata.h"
 #include "gameinfo.h"
 #include "gametype.h"
@@ -324,7 +323,6 @@ static VGuiConnect_func orig_VGuiConnect;
 static void VCALLCONV hook_VGuiConnect(void *this) {
 	orig_VGuiConnect(this);
 	do_featureinit();
-	fixes_apply();
 	unhook_vtable(*(void ***)vgui, vtidx_VGuiConnect, (void *)orig_VGuiConnect);
 }
 
@@ -437,7 +435,7 @@ static bool do_load(ifacefactory enginef, ifacefactory serverf) {
 	*p++ = (void *)&nop_ipipp_v;	  // OnQueryCvarValueFinished (002+)
 	*p++ = (void *)&nop_p_v;		  // OnEdictAllocated
 	*p   = (void *)&nop_p_v;		  // OnEdictFreed
-	if (!deferinit()) { do_featureinit(); fixes_apply(); }
+	if (!deferinit()) { do_featureinit(); }
 	if_hot (pluginhandler) {
 		cmd_plugin_load = con_findcmd("plugin_load");
 		orig_plugin_load_cb = cmd_plugin_load->cb;

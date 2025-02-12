@@ -22,10 +22,29 @@
 #include "../con_.h"
 #include "../gametype.h"
 #include "../langext.h"
+#include "../feature.h"
+
+FEATURE()
+
+struct concommandinfo {
+	void *ptr;
+	uint origflags;
+	bool is_convar;
+};
+
+struct concommandinfo saved[256];
+
+int arrayidx = 0;
 
 static void chflags(const char *name, int unset, int set) {
 	struct con_var *v = con_findvar(name);
-	if (v) v->parent->base.flags = v->parent->base.flags & ~unset | set;
+	if (v) {
+		saved[arrayidx].ptr = v;
+		saved[arrayidx].origflags = v->parent->base.flags;
+		saved[arrayidx].is_convar = true;
+		arrayidx++;
+		v->parent->base.flags = v->parent->base.flags & ~unset | set;
+	}
 }
 
 static void unhide(const char *name) {
@@ -34,7 +53,29 @@ static void unhide(const char *name) {
 
 static void chcmdflags(const char *name, int unset, int set) {
 	struct con_cmd *v = con_findcmd(name);
-	if (v) v->base.flags = v->base.flags & ~unset | set;
+	if (v) {
+		saved[arrayidx].ptr = v;
+		saved[arrayidx].origflags = v->base.flags;
+		saved[arrayidx].is_convar = false;
+		arrayidx++;
+		v->base.flags = v->base.flags & ~unset | set;
+	}
+}
+
+static void unhidecmd(const char *name) {
+	chcmdflags(name, CON_HIDDEN | CON_DEVONLY, 0);
+}
+
+static void restoreflags(void) {
+	for (int i = 0; i < arrayidx; i++) {
+		if (saved[i].is_convar) {
+			struct con_var *v = saved[i].ptr;
+			v->parent->base.flags = saved[i].origflags;
+		} else {
+			struct con_cmd *v = saved[i].ptr;
+			v->base.flags = saved[i].origflags;
+		}
+	}
 }
 
 static void generalfixes(void) {
@@ -44,7 +85,7 @@ static void generalfixes(void) {
 	unhide("demo_fastforwardfinalspeed");
 	unhide("demo_fastforwardramptime");
 	unhide("demo_fastforwardstartspeed");
-	unhide("demo_gototick");
+	unhidecmd("demo_gototick");
 	unhide("demo_interplimit");
 	unhide("demo_legacy_rollback");
 	unhide("demo_pauseatservertick");
@@ -179,10 +220,15 @@ static void l4d1specific(void) {
 	chcmdflags("update_addon_paths", 0, CON_CCMDEXEC);
 }
 
-void fixes_apply(void) {
+INIT {
 	generalfixes();
 	if (GAMETYPE_MATCHES(L4D1)) l4d1specific();
 	else if (GAMETYPE_MATCHES(L4D2x)) l4d2specific();
+	return true;
+}
+
+END {
+	restoreflags();
 }
 
 // vi: sw=4 ts=4 noet tw=80 cc=80
