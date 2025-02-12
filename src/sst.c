@@ -28,7 +28,7 @@
 #include "engineapi.h"
 #include "errmsg.h"
 #include "event.h"
-#include "fixes.h"
+#include "fixes/confixes.h"
 #include "gamedata.h"
 #include "gameinfo.h"
 #include "gametype.h"

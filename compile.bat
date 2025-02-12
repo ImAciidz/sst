@@ -78,7 +78,7 @@ setlocal DisableDelayedExpansion
 :+ errmsg.c
 :+ extmalloc.c
 :+ fastfwd.c
-:+ fixes.c
+:+ fixes/confixes.c
 :+ fixes/portal1demofix.c
 :+ fov.c
 :+ gamedata.c

@@ -67,7 +67,7 @@ src="\
 	errmsg.c
 	extmalloc.c
 	fastfwd.c
-	fixes.c
+	fixes/confixes.c
 	fov.c
 	gamedata.c
 	gameinfo.c

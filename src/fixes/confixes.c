@@ -19,9 +19,9 @@
 #include <d3d9.h>
 #endif
 
-#include "con_.h"
-#include "gametype.h"
-#include "langext.h"
+#include "../con_.h"
+#include "../gametype.h"
+#include "../langext.h"
 
 static void chflags(const char *name, int unset, int set) {
 	struct con_var *v = con_findvar(name);
