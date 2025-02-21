@@ -1,6 +1,6 @@
 /*
- * Copyright © 2024 Hayden K <imaciidz@gmail.com>
- * Copyright © 2024 Willian Henrique <wsimanbrazil@yahoo.com.br>
+ * Copyright © 2025 Hayden K <imaciidz@gmail.com>
+ * Copyright © 2025 Willian Henrique <wsimanbrazil@yahoo.com.br>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,6 +49,7 @@ static int *addonvecsz;
 static char last_mission[128] = {0};
 static char last_gamemode[128] = {0};
 static int old_addonvecsz;
+bool old_is_addons_banned;
 
 // note: the 4th parameter was first added in 2.2.0.4 (Oct 21st 2020), but
 // we don't have to worry about that since it's cdecl
@@ -88,8 +89,11 @@ static void hook_FSMAFAS(bool p1, char *p2, char *p3, bool p4) {
 	// on the cache states throughout loads). Finally, as a bonus, every call to
 	// FSMAFAS that we avoid saves about 1s on loads, so that's nice.
 
-	// assumptions: addons and mode config for addon blocking (e.g. versus)
-	// aren't being changed mid-campaign
+	// assumption: enabled addons aren't being changed mid-campaign.
+	// originally we assumed mode config for addon blocking would be static as
+	// well, but you could connect to a different server on the same campaign
+	// and gamemode as your current server that has a different config, which
+	// would lead to you having addons enabled on a server that forbids them
 
 	int curaddonvecsz = *addonvecsz;
 	// addons changed, which means we are in the main menu, another call to
@@ -104,15 +108,41 @@ static void hook_FSMAFAS(bool p1, char *p2, char *p3, bool p4) {
 	// addons didn't change and no addons are enabled: do nothing
 	if (!curaddonvecsz) return;
 
-	// cache campaign and mode names and, if we were given a campaign and a mode
-	// name, try to early exit
-	if (p2 && p3) {
-		bool earlyret = !strcmp(p2, last_mission) && !strcmp(p3, last_gamemode);
-		strcpy(last_mission, p2);
-		strcpy(last_gamemode, p3);
+	// cache campaign and mode names and, if we were given a campaign and a
+	// mode name, and the campaign is not an empty string, try to early exit.
+	// campaign can be an empty string if you are playing a gamemode not
+	// supported by the current level (such as survival on c8m1), so always
+	// execute FSMAFAS when that is the case, since we can't know if we
+	// changed campaigns since the last time FSMAFAS was executed.
+	if (p2 && p3 && *p2) {
+		bool earlyret = !memcmp(p2, last_mission, sizeof(last_mission))
+				&& !memcmp(p3, last_gamemode, sizeof(last_gamemode))
+				&& (p1 == old_is_addons_banned);
 		if (earlyret) return;
-	}
-	else {
+		// We're not certain what the supported max length for mission
+		// filenames is. It's something higher than 128, but less than 200 or
+		// so. Nobody in their right mind should be creating custom maps or
+		// modes with names this long, so we will just cap at 128. If someone
+		// encounters a map (or mode) that exceeds this limit, we can look into
+		// raising it.
+		int len1 = strnlen(p2, sizeof(last_mission));
+		if_cold (len1 == sizeof(last_mission)) {
+			errmsg_errorx("mission string exceeded assumed max length. If you"
+					"see this, please contact an SST developer.");
+			goto elseblock;
+		}
+		int len2 = strnlen(p3, sizeof(last_gamemode));
+		if_cold (len2 == sizeof(last_gamemode)) {
+			errmsg_errorx("gamemode string exceeded assumed max length. If you"
+					"see this, please contact an SST developer.");
+			goto elseblock;
+		}
+		memcpy(last_mission, p2, len1);
+		memcpy(last_gamemode, p3, len2);
+		old_is_addons_banned = p1;
+	} else {
+elseblock:
+		old_is_addons_banned = false;
 		last_mission[0] = '\0';
 		last_gamemode[0] = '\0';
 	}
@@ -139,8 +169,8 @@ static con_cmdcb orig_show_addon_metadata_cb;
 
 static inline bool find_addonvecsz(void) {
 	const uchar *insns = (const uchar*)orig_show_addon_metadata_cb;
-	// show_addon_metadata immediately checks if s_vecAddonMetadata.m_Size is 0,
-	// so we can just grab it from the CMP instruction
+	// show_addon_metadata immediately checks if s_vecAddonMetadata.m_Size is
+	// 0, so we can just grab it from the CMP instruction
 	for (const uchar *p = insns; p - insns < 32;) {
 		if (p[0] == X86_ALUMI8S && p[1] == X86_MODRM(0, 7, 5) && p[6] == 0) {
 			addonvecsz = mem_loadptr(p + 2);
@@ -153,7 +183,6 @@ static inline bool find_addonvecsz(void) {
 
 static void *broken_addon_check;
 static u8 orig_broken_addon_check_bytes[13];
-static bool has_broken_addon_check = false;
 
 static inline void nop_addon_check(bool larger_jmp_insn) {
 	// In versions prior to 2.2.0.4 (Oct 21st 2020), FSMAFAS checks if any
@@ -189,7 +218,6 @@ static inline void try_fix_broken_addon_check(void) {
 		if (p[0] == X86_ALUMI8S && p[1] == X86_MODRM(0, 7, 5) &&
 				mem_loadptr(p + 2) == addonvecsz) {
 			broken_addon_check = p;
-			has_broken_addon_check = true;
 			nop_addon_check(p[7] == X86_2BYTE);
 			return;
 		}
@@ -228,7 +256,7 @@ INIT {
 
 END {
 	if_cold (sst_userunloaded) {
-		if (has_broken_addon_check) {
+		if (broken_addon_check) {
 			memcpy(broken_addon_check, orig_broken_addon_check_bytes, 13);
 		}
 	}
