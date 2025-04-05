@@ -79,6 +79,7 @@ setlocal DisableDelayedExpansion
 :+ extmalloc.c
 :+ fastfwd.c
 :+ fixes.c
+:+ fixes/l4d1democompat.c
 :+ fov.c
 :+ gamedata.c
 :+ gameinfo.c
