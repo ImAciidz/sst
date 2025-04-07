@@ -53,6 +53,7 @@ REQUIRE_GLOBAL(srvdll)
 REQUIRE_GAMEDATA(vtidx_GameFrame) // note: for L4D1 only, always defined anyway
 REQUIRE_GAMEDATA(vtidx_GameShutdown)
 REQUIRE_GAMEDATA(vtidx_OnGameplayStart)
+REQUIRE_GAMEDATA(vtidx_GetEngineBuildNumber)
 
 static void **votecontroller;
 static int off_callerrecords = -1;
@@ -344,6 +345,8 @@ DEF_CVAR_UNREG(sst_l4d_quickreset_fastfwd,
 		"Fast-forward through cutscenes when quick-resetting", 1,
 		CON_ARCHIVE | CON_HIDDEN)
 
+int *FinaleEscapeState;
+
 DEF_CCMD_HERE_UNREG(sst_l4d_quickreset,
 		"Reset (or switch) campaign and clear all vote cooldowns", 0) {
 	if (cmd->argc > 2) {
@@ -373,6 +376,10 @@ DEF_CCMD_HERE_UNREG(sst_l4d_quickreset,
 	if (campaign && con_getvari(sst_l4d_quickreset_fastfwd) &&
 			(ffidx = getffidx(campaign)) != -1) {
 		ffdelay = 45; // 1.5s
+	}
+	// See comment in INIT
+	if (FinaleEscapeState) {
+		*FinaleEscapeState = 0;
 	}
 }
 
@@ -504,6 +511,9 @@ ok: // Director::Update calls UnfreezeTeam after the first jmp instruction
 	return false;
  }
 
+
+DECL_VFUNC_DYN(int, GetEngineBuildNumber)
+
 INIT {
 	struct con_cmd *cmd_listissues = con_findcmd("listissues");
 	if_cold (!cmd_listissues) {
@@ -556,6 +566,13 @@ INIT {
 #endif
 	// Only try cooldown stuff for L4D2, since L4D1 always had unlimited votes.
 	if (GAMETYPE_MATCHES(L4D2)) {
+		// unrelated to cooldown, initialize this director member which is
+		// responsible for the infamous swamp/cc 1 godmode/can't vote/can't idle
+		// bug so that we can clear it when running quickreset (Valve fixed this
+		// in version 2112 by clearing this member in CDirector::Reset)
+		if (GetEngineBuildNumber(engclient) < 2112) {
+			FinaleEscapeState = mem_offset(director, off_FinaleEscapeState);
+		}
 		// g_voteController is invalid if not running a server so get the
 		// vtable by inspecting the ent factory code instead
 		const struct CEntityFactory *factory = ent_getfactory("vote_controller");
