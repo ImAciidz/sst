@@ -1,5 +1,6 @@
 # CGameMovement
 vtidx_CheckJumpButton
+	OE				14 + NVDTOR
 	Portal1_3420	22 + NVDTOR
 	2013			28 + NVDTOR
 	L4D				32 + NVDTOR
@@ -7,6 +8,7 @@ vtidx_CheckJumpButton
 	Portal2			35 + NVDTOR
 off_mv 8
 	Portal1_3420 4
+	OE 4
 
 # IServerGameDLL
 vtidx_GetAllServerClasses 10
@@ -56,5 +58,7 @@ vtidx_VClient_DecodeUserCmdFromBuffer 22
 		L4D2 43 # shoutouts to 2000
 	Client013
 		L4Dbased 23
+	Client012
+		#OE
 
 # vi: sw=4 ts=4 noet tw=80 cc=80

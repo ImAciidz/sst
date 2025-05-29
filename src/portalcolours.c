@@ -108,9 +108,9 @@ INIT {
 			"UTIL_Portal_Color");
 	if_cold (h.err) return h.err;
 	hook_inline_commit(h.prologue, (void *)&hook_UTIL_Portal_Color);
-	sst_portal_colour0->cb = &colourcb;
-	sst_portal_colour1->cb = &colourcb;
-	sst_portal_colour2->cb = &colourcb;
+	sst_portal_colour0->v2.common.cb = &colourcb;
+	sst_portal_colour1->v2.common.cb = &colourcb;
+	sst_portal_colour2->v2.common.cb = &colourcb;
 	return FEAT_OK;
 #else
 #warning TODO(linux): yet more stuff!

@@ -18,6 +18,7 @@
 #ifndef INC_CON_H
 #define INC_CON_H
 
+#include "gametype.h"
 #include "intdefs.h"
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -112,9 +113,7 @@ struct con_cmd { // ConCommand in engine
 	bool has_complcb : 1, use_newcb : 1, use_newcmdiface : 1;
 };
 
-struct con_var { // ConVar in engine
-	struct con_cmdbase base;
-	void **vtable_iconvar; // IConVar in engine (pure virtual)
+struct con_var_common {
 	struct con_var *parent;
 	const char *defaultval;
 	char *strval;
@@ -134,6 +133,20 @@ struct con_var { // ConVar in engine
 	 */
 	void (*cb)(struct con_var *this);
 };
+
+struct con_var { // ConVar in engine
+	struct con_cmdbase base;
+	union {
+		struct con_var_common v1;
+		struct {
+			void **vtable_iconvar; // IConVar in engine (pure virtual)
+			struct con_var_common common;
+		} v2;
+	};
+};
+
+// shoutouts to OE for enshittifying the codebase
+extern struct con_var_common *getcommon(struct con_var *v);
 
 /* The change callback used in most branches of Source. Takes an IConVar :) */
 typedef void (*con_varcb)(void *v, const char *, float);
@@ -185,13 +198,24 @@ struct ICvar; // "
 extern struct ICvar *_con_iface;
 extern void (*_con_colourmsgf)(struct ICvar *this, const struct rgba *c,
 		const char *fmt, ...) _CON_PRINTF(3, 4);
+extern void (*_con_colourmsgoef)(const struct rgba *c, const char *fmt, ...)
+		_CON_PRINTF(2, 3);
 /*
  * This provides the same functionality as ConColorMsg which was removed from
  * tier0 in the L4D engine branch - specifically, it allows printing a message
  * with an arbitrary RGBA colour. It must only be used after a successful
  * con_init() call.
  */
-#define con_colourmsg(c, ...) _con_colourmsgf(_con_iface, c, __VA_ARGS__)
+#define con_colourmsg(c, ...) \
+if (GAMETYPE_MATCHES(OE)) { \
+	_con_colourmsgoef(c, __VA_ARGS__); \
+} else { \
+	_con_colourmsgf(_con_iface, c, __VA_ARGS__); \
+}
+//#define con_colourmsg(c, ...) con_msg(__VA_ARGS__)
+
+extern int *cmd_argc;
+extern char *(*cmd_argv)[80];
 
 /*
  * The index of the client responsible for the currently executing command,
@@ -230,14 +254,18 @@ extern struct _con_vtab_iconvar_wrap {
 			.vtable = _con_vtab_var, \
 			.name = "" #name_, .help = "" desc, .flags = (flags_) \
 		}, \
-		.vtable_iconvar = _con_vtab_iconvar, \
-		.parent = &_cvar_##name_, /* bizarre, but how the engine does it */ \
-		.defaultval = _Generic(value, char *: value, int: #value, \
-				double: #value), \
-		.strlen = sizeof(_Generic(value, char *: value, default: #value)), \
-		.fval = _Generic(value, char *: 0, int: value, double: value), \
-		.ival = _Generic(value, char *: 0, int: value, double: (int)value), \
-		.hasmin = hasmin_, .minval = (min), .hasmax = hasmax_, .maxval = (max) \
+		.v2 = { \
+			.vtable_iconvar = _con_vtab_iconvar, \
+			.common = { \
+				.parent = &_cvar_##name_, /* bizarre, but how the engine does it */ \
+				.defaultval = _Generic(value, char *: value, int: #value, \
+						double: #value), \
+				.strlen = sizeof(_Generic(value, char *: value, default: #value)), \
+				.fval = _Generic(value, char *: 0, int: value, double: value), \
+				.ival = _Generic(value, char *: 0, int: value, double: (int)value), \
+				.hasmin = hasmin_, .minval = (min), .hasmax = hasmax_, .maxval = (max) \
+			} \
+		} \
 	}; \
 	struct con_var *name_ = &_cvar_##name_;
 
@@ -289,6 +317,21 @@ extern struct _con_vtab_iconvar_wrap {
 	static void _cmdf_##name(const struct con_cmdargs *cmd); \
 	_DEF_CCMD(name, name, desc, _cmdf_##name, flags) \
 	static void _cmdf_##name(const struct con_cmdargs *cmd) \
+	/* { body here } */
+
+
+#define DEF_CCMD_HOOK(name) \
+	static void hook_##name##_cb(const struct con_cmdargs *args); \
+	static void hook_##name##_cb_oe(void) { \
+		struct con_cmdargs args; \
+		args.argc = *cmd_argc; \
+		for (int i = 0; i < 64; i++) { \
+			args.argv[i] = (*cmd_argv)[i]; \
+		} \
+		struct con_cmdargs *argss = &args; \
+		hook_##name##_cb(argss);	\
+	} \
+	static void hook_##name##_cb(const struct con_cmdargs *args) \
 	/* { body here } */
 
 /*

@@ -78,7 +78,7 @@ static bool unprot(struct CGameMovement *gm) {
 // reimplementing cheats check for dumb and bad reasons, see below
 static struct con_var *sv_cheats;
 static void cheatcb(struct con_var *this) {
-	if (this->ival) if_cold (!con_getvari(sv_cheats)) {
+	if (this->v2.common.ival) if_cold (!con_getvari(sv_cheats)) {
 		con_warn("Can't use cheat cvar sst_autojump, unless server has "
 				"sv_cheats set to 1.\n");
 		con_setvari(this, 0);
@@ -112,8 +112,11 @@ INIT {
 		// it's also necessary to do this extremely stupid callback nonsense!
 		sst_autojump->base.flags |= CON_CHEAT;
 		sv_cheats = con_findvar("sv_cheats");
-		sst_autojump->cb = cheatcb;
+		sst_autojump->v2.common.cb = cheatcb;
+		//getcommon(sst_autojump)->cb = cheatcb;
 	}
+	sst_autojump->v2.common.hasmax = true;
+	sst_autojump->v2.common.maxval = 30;
 	return FEAT_OK;
 }
 

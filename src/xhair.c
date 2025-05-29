@@ -76,7 +76,7 @@ HANDLE_EVENT(HudPaint, int w, int h) {
 }
 
 INIT {
-	sst_xhair_colour->cb = &colourcb;
+	sst_xhair_colour->v2.common.cb = &colourcb;
 	return FEAT_OK;
 }
 

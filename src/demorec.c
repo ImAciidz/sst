@@ -103,7 +103,7 @@ DECL_VFUNC_DYN(struct CDemoRecorder, void, StartRecording)
 static struct con_cmd *cmd_record, *cmd_stop;
 static con_cmdcb orig_record_cb, orig_stop_cb;
 
-static void hook_record_cb(const struct con_cmdargs *args) {
+DEF_CCMD_HOOK(record) {
 	if_cold (!CHECK_DemoControlAllowed()) return;
 	bool was = *recording;
 	if (!was && args->argc == 2 || args->argc == 3) {
@@ -166,7 +166,7 @@ static void hook_record_cb(const struct con_cmdargs *args) {
 	EMIT_DemoRecordStarting();
 }
 
-static void hook_stop_cb(const struct con_cmdargs *args) {
+DEF_CCMD_HOOK(stop) {
 	if_cold (!CHECK_DemoControlAllowed()) return;
 	wantstop = true;
 	orig_stop_cb(args);
@@ -289,6 +289,13 @@ INIT {
 
 	cmd_record->cb = &hook_record_cb;
 	cmd_stop->cb = &hook_stop_cb;
+	if(GAMETYPE_MATCHES(OE)) {
+		cmd_record->cb_v1 = &hook_record_cb_oe;
+		cmd_stop->cb_v1 = &hook_stop_cb_oe;
+	} else {
+		cmd_record->cb = &hook_record_cb;
+		cmd_stop->cb = &hook_stop_cb;
+	}
 
 	return FEAT_OK;
 }

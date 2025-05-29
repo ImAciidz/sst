@@ -88,8 +88,8 @@ INIT {
 	if_cold (!cmd_fov) return FEAT_INCOMPAT; // shouldn't happen, but who knows!
 	if (real_fov_desired = con_findvar("fov_desired")) {
 		// latest steampipe already goes up to 120 fov
-		if (real_fov_desired->parent->maxval == 120) return FEAT_SKIP;
-		real_fov_desired->parent->maxval = 120;
+		if (real_fov_desired->v2.common.parent->v2.common.maxval == 120) return FEAT_SKIP;
+		real_fov_desired->v2.common.parent->v2.common.maxval = 120;
 	}
 	else {
 		if (!has_ent) return FEAT_INCOMPAT;
@@ -108,8 +108,8 @@ INIT {
 	hook_inline_commit(h.prologue, (void *)&hook_SetDefaultFOV);
 
 	// we might not be using our cvar but simpler to do this unconditionally
-	fov_desired->cb = &fovcb;
-	fov_desired->parent->base.flags &= ~CON_HIDDEN;
+	fov_desired->v2.common.cb = &fovcb;
+	fov_desired->v2.common.parent->base.flags &= ~CON_HIDDEN;
 	// hide the original fov command since we've effectively broken it anyway :)
 	cmd_fov->base.flags |= CON_DEVONLY;
 	return FEAT_OK;
@@ -118,7 +118,7 @@ INIT {
 END {
 	if_hot (!sst_userunloaded) return;
 	if (real_fov_desired && real_fov_desired != fov_desired) {
-		real_fov_desired->parent->maxval = 90;
+		real_fov_desired->v2.common.parent->v2.common.maxval = 90;
 		if (con_getvarf(real_fov_desired) > 90) {
 			con_setvarf(real_fov_desired, 90); // blegh.
 		}

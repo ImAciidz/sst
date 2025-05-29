@@ -85,7 +85,7 @@ INIT {
 	struct con_cmd *snd_restart = con_findcmd("snd_restart");
 	if_hot (snd_restart) {
 		snd_restart_cb = con_getcmdcbv1(snd_restart);
-		snd_mute_losefocus->cb = &losefocuscb;
+		snd_mute_losefocus->v2.common.cb = &losefocuscb;
 	}
 	else {
 		errmsg_warnx("couldn't find snd_restart");

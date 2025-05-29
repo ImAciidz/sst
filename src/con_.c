@@ -29,6 +29,9 @@
 #include "os.h"
 #include "vcall.h"
 #include "version.h"
+#include "x86.h"
+#include "x86util.h"
+#include "mem.h"
 
 /******************************************************************************\
  * Have you ever noticed that when someone comments "here be dragons" there's *
@@ -44,6 +47,7 @@ int con_cmdclient;
 DECL_VFUNC(struct ICvar, void *, FindCommandBase_p2, 13, const char *)
 DECL_VFUNC(struct ICvar, void *, FindCommand_nonp2, 14, const char *)
 DECL_VFUNC(struct ICvar, void *, FindVar_nonp2, 12, const char *)
+DECL_VFUNC(struct ICvar, void *, GetCommands_OE, 9)
 
 DECL_VFUNC_DYN(struct ICvar, int, AllocateDLLIdentifier)
 DECL_VFUNC_DYN(struct ICvar, void, RegisterConCommand, /*ConCommandBase*/ void *)
@@ -53,20 +57,33 @@ DECL_VFUNC_DYN(struct ICvar, struct con_var *, FindVar, const char *)
 DECL_VFUNC_DYN(struct ICvar, struct con_cmd *, FindCommand, const char *)
 DECL_VFUNC_DYN(struct ICvar, void, CallGlobalChangeCallbacks, struct con_var *,
 		const char *, float)
+DECL_VFUNC(struct ICvar, void, CallGlobalChangeCallbacks_OE, 12, struct con_var *,
+		const char *)
 // sad: since adding the cool abstraction, we can't do varargs (because you
 // can't pass varargs to other varargs of course). we only get a pointer to it
 // via VFUNC so just declare the typedef here - I don't wanna write any more
 // macros today.
 typedef void (*ConsoleColorPrintf_func)(struct ICvar *, const struct rgba *,
 		const char *, ...);
+typedef void (*ConsoleColorPrintf_OE_func)(const struct rgba *,
+		const char *, ...);
 
 // these have to be extern for con_colourmsg(), due to varargs nonsense
 struct ICvar *_con_iface;
 ConsoleColorPrintf_func _con_colourmsgf;
+ConsoleColorPrintf_OE_func _con_colourmsgoef;
+
+struct con_var_common *getcommon(struct con_var *v) {
+	if (GAMETYPE_MATCHES(OE)) {
+		return &(v->v1);
+	} else {
+		return &(v->v2.common);
+	}
+}
 
 static inline void initval(struct con_var *v) {
-	v->strval = extmalloc(v->strlen); // note: strlen is preset in _DEF_CVAR()
-	memcpy(v->strval, v->defaultval, v->strlen);
+	v->v2.common.strval = extmalloc(v->v2.common.strlen); // note: strlen is preset in _DEF_CVAR()
+	memcpy(v->v2.common.strval, v->v2.common.defaultval, v->v2.common.strlen);
 }
 
 // to try and match the engine even though it's probably not strictly required,
@@ -86,39 +103,53 @@ static bool VCALLCONV IsCommand_var(void *this) { return false; }
 static bool VCALLCONV IsFlagSet_cmd(struct con_cmd *this, int flags) {
 	return !!(this->base.flags & flags);
 }
+static bool VCALLCONV IsFlagSet_var_OE(struct con_var *this, int flags) {
+	return !!(this->v1.parent->base.flags & flags);
+}
 static bool VCALLCONV IsFlagSet_var(struct con_var *this, int flags) {
-	return !!(this->parent->base.flags & flags);
+	return !!(this->v2.common.parent->base.flags & flags);
 }
 static void VCALLCONV AddFlags_cmd(struct con_cmd *this, int flags) {
 	this->base.flags |= flags;
 }
+static void VCALLCONV AddFlags_var_OE(struct con_var *this, int flags) {
+	this->v1.parent->base.flags |= flags;
+}
 static void VCALLCONV AddFlags_var(struct con_var *this, int flags) {
-	this->parent->base.flags |= flags;
+	this->v2.common.parent->base.flags |= flags;
 }
 static void VCALLCONV RemoveFlags_cmd(struct con_cmd *this, int flags) {
 	this->base.flags &= ~flags;
 }
+// no OE counterpart for this (see con_init())
 static void VCALLCONV RemoveFlags_var(struct con_var *this, int flags) {
-	this->parent->base.flags &= ~flags;
+	this->v2.common.parent->base.flags &= ~flags;
 }
 static int VCALLCONV GetFlags_cmd(struct con_cmd *this) {
 	return this->base.flags;
 }
+// no OE counterpart for this (see con_init())
 static int VCALLCONV GetFlags_var(struct con_var *this) {
-	return this->parent->base.flags;
+	return this->v2.common.parent->base.flags;
 }
 
 static const char *VCALLCONV GetName_cmd(struct con_cmd *this) {
 	return this->base.name;
 }
+static const char *VCALLCONV GetName_var_OE(struct con_var *this) {
+	return this->v1.parent->base.name;
+}
 static const char *VCALLCONV GetName_var(struct con_var *this) {
-	return this->parent->base.name;
+	return this->v2.common.parent->base.name;
 }
 static const char *VCALLCONV GetHelpText_cmd(struct con_cmd *this) {
 	return this->base.help;
 }
+static const char *VCALLCONV GetHelpText_var_OE(struct con_var *this) {
+	return this->v1.parent->base.help;
+}
 static const char *VCALLCONV GetHelpText_var(struct con_var *this) {
-	return this->parent->base.help;
+	return this->v2.common.parent->base.help;
 }
 static bool VCALLCONV IsRegistered(struct con_cmdbase *this) {
 	return this->registered;
@@ -130,9 +161,16 @@ static void VCALLCONV Create_base(struct con_cmdbase *this, const char *name,
 		const char *help, int flags) {} // nop, we static init already
 static void VCALLCONV Init(struct con_cmdbase *this) {} // ""
 
+
+static bool VCALLCONV ClampValue_OE(struct con_var *this, float *f) {
+	if (this->v1.hasmin && this->v1.minval > *f) { *f = this->v1.minval; return true; }
+	if (this->v1.hasmax && this->v1.maxval < *f) { *f = this->v1.maxval; return true; }
+	return false;
+}
+
 static bool VCALLCONV ClampValue(struct con_var *this, float *f) {
-	if (this->hasmin && this->minval > *f) { *f = this->minval; return true; }
-	if (this->hasmax && this->maxval < *f) { *f = this->maxval; return true; }
+	if (this->v2.common.hasmin && this->v2.common.minval > *f) { *f = this->v2.common.minval; return true; }
+	if (this->v2.common.hasmax && this->v2.common.maxval < *f) { *f = this->v2.common.maxval; return true; }
 	return false;
 }
 
@@ -144,31 +182,62 @@ int VCALLCONV AutoCompleteSuggest(struct con_cmd *this, const char *partial,
 bool VCALLCONV CanAutoComplete(struct con_cmd *this) {
 	return false;
 }
+
+
+int *cmd_argc = 0;
+char *(*cmd_argv)[80];
+
+void VCALLCONV Dispatch_OE(struct con_cmd *this) {
+	struct con_cmdargs args;
+	args.argc = *cmd_argc;
+	for (int i = 0; i < 64; i++) {
+		args.argv[i] = (*cmd_argv)[i];
+	}
+	struct con_cmdargs *argss = &args;
+	this->cb(argss);
+}
+
 void VCALLCONV Dispatch(struct con_cmd *this, const struct con_cmdargs *args) {
 	// only try cb; cbv1 and iface should never get used by us
 	if (this->use_newcb && this->cb) this->cb(args);
 }
 
-static void VCALLCONV ChangeStringValue(struct con_var *this, const char *s,
-		float oldf) {
-	char *old = alloca(this->strlen);
-	memcpy(old, this->strval, this->strlen);
+static void VCALLCONV ChangeStringValue_OE(struct con_var *this, const char *s) {
+	char *old = alloca(this->v1.strlen);
+	memcpy(old, this->v1.strval, this->v1.strlen);
 	int len = strlen(s) + 1;
-	if (len > this->strlen) {
-		this->strval = extrealloc(this->strval, len);
-		this->strlen = len;
+	if (len > this->v1.strlen) {
+		this->v1.strval = extrealloc(this->v1.strval, len);
+		this->v1.strlen = len;
 	}
-	memcpy(this->strval, s, len);
+	memcpy(this->v1.strval, s, len);
 	// callbacks don't matter as far as ABI compat goes (and thank goodness
 	// because e.g. portal2 randomly adds a *list* of callbacks!?). however we
 	// do need callbacks for at least one feature, so do our own minimal thing
-	if (this->cb) this->cb(this);
+	if (this->v1.cb) this->v1.cb(this);
+	// also call global callbacks, as is polite.
+	CallGlobalChangeCallbacks_OE(_con_iface, this, old);
+}
+
+static void VCALLCONV ChangeStringValue(struct con_var *this, const char *s,
+		float oldf) {
+	char *old = alloca(this->v2.common.strlen);
+	memcpy(old, this->v2.common.strval, this->v2.common.strlen);
+	int len = strlen(s) + 1;
+	if (len > this->v2.common.strlen) {
+		this->v2.common.strval = extrealloc(this->v2.common.strval, len);
+		this->v2.common.strlen = len;
+	}
+	memcpy(this->v2.common.strval, s, len);
+	// callbacks don't matter as far as ABI compat goes (and thank goodness
+	// because e.g. portal2 randomly adds a *list* of callbacks!?). however we
+	// do need callbacks for at least one feature, so do our own minimal thing
+	if (this->v2.common.cb) this->v2.common.cb(this);
 	// also call global callbacks, as is polite.
 	CallGlobalChangeCallbacks(_con_iface, this, old, oldf);
 }
 
-static void VCALLCONV InternalSetValue_impl(struct con_var *this, const char *v) {
-	float oldf = this->fval;
+static void VCALLCONV InternalSetValue_impl_OE(struct con_var *this, const char *v) {
 	float newf = atof(v);
 	char tmp[32];
 	// NOTE: calling our own ClampValue and ChangeString, not bothering with
@@ -177,32 +246,70 @@ static void VCALLCONV InternalSetValue_impl(struct con_var *this, const char *v)
 		snprintf(tmp, sizeof(tmp), "%f", newf);
 		v = tmp;
 	}
-	this->fval = newf;
-	this->ival = (int)newf;
+	this->v1.fval = newf;
+	this->v1.ival = (int)newf;
+	if (!(this->base.flags & CON_NOPRINT)) ChangeStringValue_OE(this, v);
+}
+
+static void VCALLCONV InternalSetValue_impl(struct con_var *this, const char *v) {
+	float oldf = this->v2.common.fval;
+	float newf = atof(v);
+	char tmp[32];
+	// NOTE: calling our own ClampValue and ChangeString, not bothering with
+	// vtable (it's internal anyway, so we're never calling into engine code)
+	if (ClampValue(this, &newf)) {
+		snprintf(tmp, sizeof(tmp), "%f", newf);
+		v = tmp;
+	}
+	this->v2.common.fval = newf;
+	this->v2.common.ival = (int)newf;
 	if (!(this->base.flags & CON_NOPRINT)) ChangeStringValue(this, v, oldf);
 }
 
-static void VCALLCONV InternalSetFloatValue_impl(struct con_var *this, float v) {
-	if (v == this->fval) return;
+static void VCALLCONV InternalSetFloatValue_impl_OE(struct con_var *this, float v) {
+	if (v == this->v1.fval) return;
 	ClampValue(this, &v);
-	float old = this->fval;
-	this->fval = v; this->ival = (int)this->fval;
+	this->v1.fval = v; this->v1.ival = (int)this->v1.fval;
 	if (!(this->base.flags & CON_NOPRINT)) {
 		char tmp[32];
-		snprintf(tmp, sizeof(tmp), "%f", this->fval);
+		snprintf(tmp, sizeof(tmp), "%f", this->v1.fval);
+		ChangeStringValue_OE(this, tmp);
+	}
+}
+
+static void VCALLCONV InternalSetFloatValue_impl(struct con_var *this, float v) {
+	if (v == this->v2.common.fval) return;
+	ClampValue(this, &v);
+	float old = this->v2.common.fval;
+	this->v2.common.fval = v; this->v2.common.ival = (int)this->v2.common.fval;
+	if (!(this->base.flags & CON_NOPRINT)) {
+		char tmp[32];
+		snprintf(tmp, sizeof(tmp), "%f", this->v2.common.fval);
 		ChangeStringValue(this, tmp, old);
 	}
 }
 
-static void VCALLCONV InternalSetIntValue_impl(struct con_var *this, int v) {
-	if (v == this->ival) return;
+static void VCALLCONV InternalSetIntValue_impl_OE(struct con_var *this, int v) {
+	if (v == this->v1.ival) return;
 	float f = (float)v;
 	if (ClampValue(this, &f)) v = (int)f;
-	float old = this->fval;
-	this->fval = f; this->ival = v;
+	this->v1.fval = f; this->v1.ival = v;
 	if (!(this->base.flags & CON_NOPRINT)) {
 		char tmp[32];
-		snprintf(tmp, sizeof(tmp), "%f", this->fval);
+		snprintf(tmp, sizeof(tmp), "%f", this->v1.fval);
+		ChangeStringValue_OE(this, tmp);
+	}
+}
+
+static void VCALLCONV InternalSetIntValue_impl(struct con_var *this, int v) {
+	if (v == this->v2.common.ival) return;
+	float f = (float)v;
+	if (ClampValue(this, &f)) v = (int)f;
+	float old = this->v2.common.fval;
+	this->v2.common.fval = f; this->v2.common.ival = v;
+	if (!(this->base.flags & CON_NOPRINT)) {
+		char tmp[32];
+		snprintf(tmp, sizeof(tmp), "%f", this->v2.common.fval);
 		ChangeStringValue(this, tmp, old);
 	}
 }
@@ -212,37 +319,48 @@ DECL_VFUNC_DYN(struct con_var, void, InternalSetFloatValue, float)
 DECL_VFUNC_DYN(struct con_var, void, InternalSetIntValue, int)
 DECL_VFUNC_DYN(struct con_var, void, InternalSetColorValue, struct rgba)
 
+
+static void VCALLCONV SetValue_str_thunk_OE(struct con_var *var, const char *v) {
+	InternalSetValue(var->v1.parent, v);
+}
+static void VCALLCONV SetValue_f_thunk_OE(struct con_var *var, float v) {
+	InternalSetFloatValue(var->v1.parent, v);
+}
+static void VCALLCONV SetValue_i_thunk_OE(struct con_var *var, int v) {
+	InternalSetIntValue(var->v1.parent, v);
+}
+
 // IConVar calls get this-adjusted pointers, so just subtract the offset
 static void VCALLCONV SetValue_str_thunk(void *thisoff, const char *v) {
 	struct con_var *this = mem_offset(thisoff,
-			-offsetof(struct con_var, vtable_iconvar));
-	InternalSetValue(this->parent, v);
+			-offsetof(struct con_var, v2.vtable_iconvar));
+	InternalSetValue(this->v2.common.parent, v);
 }
 static void VCALLCONV SetValue_f_thunk(void *thisoff, float v) {
 	struct con_var *this = mem_offset(thisoff,
-			-offsetof(struct con_var, vtable_iconvar));
-	InternalSetFloatValue(this->parent, v);
+			-offsetof(struct con_var, v2.vtable_iconvar));
+	InternalSetFloatValue(this->v2.common.parent, v);
 }
 static void VCALLCONV SetValue_i_thunk(void *thisoff, int v) {
 	struct con_var *this = mem_offset(thisoff,
-			-offsetof(struct con_var, vtable_iconvar));
-	InternalSetIntValue(this->parent, v);
+			-offsetof(struct con_var, v2.vtable_iconvar));
+	InternalSetIntValue(this->v2.common.parent, v);
 }
 static void VCALLCONV SetValue_colour_thunk(void *thisoff, struct rgba v) {
 	struct con_var *this = mem_offset(thisoff,
-			-offsetof(struct con_var, vtable_iconvar));
-	InternalSetColorValue(this->parent, v);
+			-offsetof(struct con_var, v2.vtable_iconvar));
+	InternalSetColorValue(this->v2.common.parent, v);
 }
 
 // more misc thunks, hopefully these just compile to a lea and a jmp
 static const char *VCALLCONV GetName_thunk(void *thisoff) {
 	struct con_var *this = mem_offset(thisoff,
-			-offsetof(struct con_var, vtable_iconvar));
+			-offsetof(struct con_var, v2.vtable_iconvar));
 	return GetName_var(this);
 }
 static bool VCALLCONV IsFlagSet_thunk(void *thisoff, int flags) {
 	struct con_var *this = mem_offset(thisoff,
-			-offsetof(struct con_var, vtable_iconvar));
+			-offsetof(struct con_var, v2.vtable_iconvar));
 	return IsFlagSet_var(this, flags);
 }
 
@@ -285,8 +403,11 @@ struct _con_vtab_var_wrap _con_vtab_var_wrap = {
 	(void *)&dtor,
 #endif
 	(void *)&IsCommand_var,
+	// OE ruins everything
+#ifndef _WIN32
 	(void *)&IsFlagSet_var,
 	(void *)&AddFlags_var
+#endif
 };
 
 struct _con_vtab_iconvar_wrap _con_vtab_iconvar_wrap = {
@@ -305,11 +426,72 @@ struct _con_vtab_iconvar_wrap _con_vtab_iconvar_wrap = {
 
 void con_regvar(struct con_var *v) {
 	initval(v);
+	if (GAMETYPE_MATCHES(OE)) {
+		v->v1 = v->v2.common;
+	}
 	RegisterConCommand(_con_iface, v);
 }
 
 void con_regcmd(struct con_cmd *c) {
 	RegisterConCommand(_con_iface, c);
+}
+
+
+DECL_VFUNC(struct VEngineClient, void, Cmd_Argv, 32)
+
+static bool find_argcandargv(void) {
+	void *boaner = VFUNC(engclient, Cmd_Argv);
+	const uchar *insns = (const uchar *)boaner;
+	for (const uchar *p = insns; p - insns < 32;) {
+		if (p[0] == X86_CALL) {
+			insns = p + 5 + mem_loads32(p + 1);
+			for (const uchar *p = insns; p - insns < 32;) {
+				if (p[0] == 0x3B && p[1] == 0x05) {
+					cmd_argc = mem_loadptr(p + 2);
+				}
+				if (p[0] == 0x8b && p[1] == 0x04 && p[2] == 0x85) {
+					cmd_argv = mem_loadptr(p + 3);
+					if (cmd_argc) {	return true; }
+				}
+				NEXT_INSN(p, "cmd_argv, cmd_argc");
+			}
+			return false;
+		}
+		NEXT_INSN(p, "::Cmd_Argv");
+	}
+	return false;
+}
+
+__declspec(dllimport) void *GetSpewOutputFunc(void);
+
+//void *Con_ColorPrintf = 0;
+static void *find_Con_ColorPrintf(void) {
+	void *spew = GetSpewOutputFunc();
+	const uchar *insns = (const uchar *)spew;
+	for (const uchar *p = insns; p - insns < 320;) {
+		if (p[0] == 0x51 && p[1] == 0x68 && p[6] == X86_CALL && p[11] == 0x83 &&
+				p[12] == 0xC4 ) {
+			con_msg("success!!!!!!!!!\n");
+			con_warn("BIG GIGANTIC PENIS\n");
+			return (void *)(p + 11 + mem_loads32(p + 7));
+		}
+		NEXT_INSN(p, "Con_ColorPrintf");
+	}
+	return 0;
+}
+
+int *host_initialized;
+
+static void *find_host_initialized(void *Con_ColorPrintf) {
+	const uchar *insns = (const uchar*)Con_ColorPrintf;
+	for (const uchar *p = insns; p - insns < 16;) {
+		if (p[0] == 0x80 && p[1] == 0x3D) {
+			con_msg("host_initialized %p\n", (void*)mem_loads32(p + 2));
+			return (void*)mem_loads32(p + 2);
+		}
+		NEXT_INSN(p, "host_initialized");
+	}
+	return 0;
 }
 
 // XXX: these should use vcall/gamedata stuff as they're only used for the
@@ -323,8 +505,20 @@ enum { vtidx_SetValue_str = 0, vtidx_SetValue_f = 1, vtidx_SetValue_i = 2 };
 #endif
 
 void con_init() {
-	_con_colourmsgf = VFUNC(_con_iface, ConsoleColorPrintf);
-	dllid = AllocateDLLIdentifier(_con_iface);
+	if (GAMETYPE_MATCHES(OE)) {
+		find_argcandargv();
+		_con_colourmsgoef = (ConsoleColorPrintf_OE_func)find_Con_ColorPrintf();
+		con_msg("_con_colourmsgoef %p\n", _con_colourmsgoef);
+		host_initialized = find_host_initialized((void *)_con_colourmsgoef);
+		if (host_initialized) {
+			if (*host_initialized == 0) {
+				*host_initialized = 1;
+			}
+		}
+	} else {
+		_con_colourmsgf = VFUNC(_con_iface, ConsoleColorPrintf);
+		dllid = AllocateDLLIdentifier(_con_iface);
+	}
 
 	void **pc = _con_vtab_cmd + 3 + NVDTOR, **pv = _con_vtab_var + 3 + NVDTOR,
 			**pi = _con_vtab_iconvar
@@ -332,6 +526,16 @@ void con_init() {
 				+ 3
 #endif
 			;
+#ifdef _WIN32
+	pv = _con_vtab_var + 1 + NVDTOR;
+	if (GAMETYPE_MATCHES(OE)) {
+		*pv++ = (void *)&IsFlagSet_var_OE;
+		*pv++ = (void *)&AddFlags_var_OE;
+	} else {
+		*pv++ = (void *)&IsFlagSet_var;
+		*pv++ = (void *)&AddFlags_var;
+	}
+#endif
 	if (GAMETYPE_MATCHES(L4Dbased)) { // 007 base
 		*pc++ = (void *)&RemoveFlags_cmd;
 		*pc++ = (void *)&GetFlags_cmd;
@@ -342,31 +546,62 @@ void con_init() {
 	*pc++ = (void *)&GetName_cmd;
 	*pc++ = (void *)&GetHelpText_cmd;
 	*pc++ = (void *)&IsRegistered;
-	*pc++ = (void *)&GetDLLIdentifier;
+	if (!GAMETYPE_MATCHES(OE)) {
+		*pc++ = (void *)&GetDLLIdentifier;
+	}
 	*pc++ = (void *)&Create_base;
 	*pc++ = (void *)&Init;
 	// cmd-specific
 	*pc++ = (void *)&AutoCompleteSuggest;
 	*pc++ = (void *)&CanAutoComplete;
-	*pc++ = (void *)&Dispatch;
+	if (GAMETYPE_MATCHES(OE)) {
+		*pc++ = (void *)&Dispatch_OE;
+	} else {
+		*pc++ = (void *)&Dispatch;
+	}
 	// base stuff in var
-	*pv++ = (void *)&GetName_var;
-	*pv++ = (void *)&GetHelpText_var;
+	if (GAMETYPE_MATCHES(OE)) {
+		*pv++ = (void *)&GetName_var_OE;
+		*pv++ = (void *)&GetHelpText_var_OE;
+	} else {
+		*pv++ = (void *)&GetName_var;
+		*pv++ = (void *)&GetHelpText_var;
+	}
 	*pv++ = (void *)&IsRegistered;
-	*pv++ = (void *)&GetDLLIdentifier;
+	if (!GAMETYPE_MATCHES(OE)) {
+		*pv++ = (void *)&GetDLLIdentifier;
+	}
 	*pv++ = (void *)&Create_base;
 	*pv++ = (void *)&Init;
 	// var-specific
-	vtidx_InternalSetValue = pv - _con_vtab_var;
-	*pv++ = (void *)&InternalSetValue_impl;
-	*pv++ = (void *)&InternalSetFloatValue_impl;
-	*pv++ = (void *)&InternalSetIntValue_impl;
+	if (GAMETYPE_MATCHES(OE)) {
+		*pv++ = (void *)&SetValue_i_thunk_OE;
+		*pv++ = (void *)&SetValue_f_thunk_OE;
+		*pv++ = (void *)&SetValue_str_thunk_OE;
+		vtidx_InternalSetValue = pv - _con_vtab_var;
+		vtidx_SetValue_f = vtidx_InternalSetValue - 2;
+		vtidx_SetValue_i = vtidx_InternalSetValue - 3;
+		vtidx_SetValue_str = vtidx_InternalSetValue - 1;
+		*pv++ = (void *)&InternalSetValue_impl_OE;
+		*pv++ = (void *)&InternalSetFloatValue_impl_OE;
+		*pv++ = (void *)&InternalSetIntValue_impl_OE;
+	} else {
+		vtidx_InternalSetValue = pv - _con_vtab_var;
+		*pv++ = (void *)&InternalSetValue_impl;
+		*pv++ = (void *)&InternalSetFloatValue_impl;
+		*pv++ = (void *)&InternalSetIntValue_impl;
+	}
 	if (GAMETYPE_MATCHES(L4D2x) || GAMETYPE_MATCHES(Portal2)) { // ugh, annoying
 		// InternalSetColorValue, literally the same machine instructions as int
 		*pv++ = (void *)&InternalSetIntValue_impl;
 	}
-	*pv++ = (void *)&ClampValue;;
-	*pv++ = (void *)&ChangeStringValue;
+	if (GAMETYPE_MATCHES(OE)) {
+		*pv++ = (void *)&ClampValue_OE;
+		*pv++ = (void *)&ChangeStringValue_OE;
+	} else {
+		*pv++ = (void *)&ClampValue;
+		*pv++ = (void *)&ChangeStringValue;
+	}
 	*pv++ = (void *)&Create_var;
 	if (GAMETYPE_MATCHES(L4D2x) || GAMETYPE_MATCHES(Portal2)) {
 		*pi++ = (void *)&SetValue_colour_thunk;
@@ -445,12 +680,16 @@ bool con_detect(int pluginver) {
 		else _gametype_tag |= _gametype_tag_OrangeBox;
 		return true;
 	}
-	if (factory_engine("VEngineCvar003", 0)) {
-		warnoe();
-		helpuserhelpus(pluginver, '3');
-		return false;
+	if (_con_iface = factory_engine("VEngineCvar003", 0)) {
+		_gametype_tag |= _gametype_tag_OE;
+		//void *penis = VFUNC(_con_iface, GetCommands_OE);
+		//void *penis = GetCommands_OE(_con_iface);
+		//warnoe();
+		//helpuserhelpus(pluginver, '3');
+		return true;
 	}
 	// I don't suppose there's anything below 002 worth caring about? Shrug.
+	// (are there any games that even use 002? only seems like 001 released)
 	if (factory_engine("VEngineCvar002", 0)) {
 		warnoe();
 		helpuserhelpus(pluginver, '2');
@@ -462,7 +701,22 @@ bool con_detect(int pluginver) {
 }
 
 void con_disconnect() {
-	UnregisterConCommands(_con_iface, dllid);
+	if (GAMETYPE_MATCHES(OE)) {
+		const uchar *temp = (const uchar *)VFUNC(_con_iface, GetCommands_OE);
+		temp = temp + 5 + mem_loads32(temp + 1);
+		struct con_cmdbase **shit = mem_loadptr(temp + 1);
+		while (*shit) {
+			if ((*shit)->vtable == _con_vtab_cmd || (*shit)->vtable == _con_vtab_var) {
+				struct con_cmdbase *next = (*shit)->next;
+				(*shit)->next = 0;
+				*shit = next;
+			} else {
+				shit = &(*shit)->next;
+			}
+		}
+	} else {
+		UnregisterConCommands(_con_iface, dllid);
+	}
 }
 
 struct con_var *con_findvar(const char *name) {
@@ -470,10 +724,20 @@ struct con_var *con_findvar(const char *name) {
 }
 
 struct con_cmd *con_findcmd(const char *name) {
-	return FindCommand(_con_iface, name);
+	if (!GAMETYPE_MATCHES(OE)) return FindCommand(_con_iface, name);
+	struct con_cmdbase *cmd = VCALL(_con_iface, GetCommands_OE);
+	for ( ; cmd; cmd = cmd->next) {
+		if ( !_stricmp(name, cmd->name)) {
+			return (struct con_cmd *)cmd;
+		}
+	}
+	return 0;
 }
 
-#define GETTER(T, N, M) T N(const struct con_var *v) { return v->parent->M; }
+#define GETTER(T, N, M) T N(const struct con_var *v) { \
+	if (GAMETYPE_MATCHES(OE)) { return v->v1.parent->v1.M; } \
+	return v->v2.common.parent->v2.common.M; \
+}
 GETTER(const char *, con_getvarstr, strval)
 GETTER(float, con_getvarf, fval)
 GETTER(int, con_getvari, ival)
@@ -483,8 +747,13 @@ GETTER(int, con_getvari, ival)
 // see also above comment on the vtidx definitions
 #define SETTER(T, I, N) \
 	void N(struct con_var *v, T x) { \
-		((void (*VCALLCONV)(void *, T))(v->vtable_iconvar[I]))( \
-				&v->vtable_iconvar, x); \
+		if (GAMETYPE_MATCHES(OE)) { \
+			((void (*VCALLCONV)(void *, T))(v->base.vtable[I]))( \
+				&v->base.vtable, x); \
+		} else { \
+			((void (*VCALLCONV)(void *, T))(v->v2.vtable_iconvar[I]))( \
+				&v->v2.vtable_iconvar, x); \
+		} \
 	}
 SETTER(const char *, vtidx_SetValue_str, con_setvarstr)
 SETTER(float, vtidx_SetValue_f, con_setvarf)
@@ -492,11 +761,11 @@ SETTER(int, vtidx_SetValue_i, con_setvari)
 #undef SETTER
 
 con_cmdcb con_getcmdcb(const struct con_cmd *cmd) {
-	return !cmd->use_newcmdiface && cmd->use_newcb ? cmd->cb : 0;
+	return cmd->cb;//!cmd->use_newcmdiface && cmd->use_newcb ? cmd->cb : 0;
 }
 
 con_cmdcbv1 con_getcmdcbv1(const struct con_cmd *cmd) {
-	return !cmd->use_newcmdiface && !cmd->use_newcb ? cmd->cb_v1 : 0;
+	return cmd->cb_v1;//!cmd->use_newcmdiface && !cmd->use_newcb ? cmd->cb_v1 : 0;
 }
 
 // vi: sw=4 ts=4 noet tw=80 cc=80

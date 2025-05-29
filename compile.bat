@@ -22,7 +22,7 @@ set warnings=-Wall -pedantic -Wno-parentheses -Wno-missing-braces ^
 -Wno-gnu-zero-variadic-macro-arguments -Werror=implicit-function-declaration ^
 -Werror=vla
 
-set dbg=0
+set dbg=1
 :: XXX: -Og would be nice but apparently a bunch of stuff still gets inlined
 :: which can be somewhat annoying so -O0 it is.
 if "%dbg%"=="1" (

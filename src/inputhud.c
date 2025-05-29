@@ -424,22 +424,22 @@ INIT {
 	else if (GAMETYPE_MATCHES(L4D)) layout = &layout_l4d;
 	// TODO(compat): more game-specific layouts!
 
-	sst_inputhud_bgcolour_normal->cb = &colourcb;
-	sst_inputhud_bgcolour_pressed->cb = &colourcb;
-	sst_inputhud_fgcolour->cb = &colourcb;
+	sst_inputhud_bgcolour_normal->v2.common.cb = &colourcb;
+	sst_inputhud_bgcolour_pressed->v2.common.cb = &colourcb;
+	sst_inputhud_fgcolour->v2.common.cb = &colourcb;
 
 	// Default HUD position would clash with L4D player health HUDs and
 	// HL2 sprint HUD, so move it up. This is a bit yucky, but at least we don't
 	// have to go through all the virtual setter crap twice...
 	if (GAMETYPE_MATCHES(L4D)) {
-		sst_inputhud_y->defaultval = "0.82";
-		sst_inputhud_y->fval = 0.82f;
-		sst_inputhud_y->ival = 0;
+		sst_inputhud_y->v2.common.defaultval = "0.82";
+		sst_inputhud_y->v2.common.fval = 0.82f;
+		sst_inputhud_y->v2.common.ival = 0;
 	}
 	else if (GAMETYPE_MATCHES(HL2series)) {
-		sst_inputhud_y->defaultval = "0.75";
-		sst_inputhud_y->fval = 0.75f;
-		sst_inputhud_y->ival = 0;
+		sst_inputhud_y->v2.common.defaultval = "0.75";
+		sst_inputhud_y->v2.common.fval = 0.75f;
+		sst_inputhud_y->v2.common.ival = 0;
 	}
 
 	return FEAT_OK;
