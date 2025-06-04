@@ -76,7 +76,7 @@ HANDLE_EVENT(HudPaint, int w, int h) {
 }
 
 INIT {
-	sst_xhair_colour->cb = &colourcb;
+	getcommon(sst_xhair_colour)->cb = &colourcb;
 	return FEAT_OK;
 }
 

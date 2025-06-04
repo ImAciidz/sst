@@ -4,6 +4,7 @@
 
 F(Msg)
 F(Warning)
+F(GetSpewOutputFunc)
 #ifdef _WIN32
 V(g_pMemAlloc) // this doesn't exist at all on Linux
 #else
