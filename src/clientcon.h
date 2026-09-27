@@ -18,6 +18,8 @@
 #define INC_CLIENTCON_H
 
 struct edict;
+struct IEffects { void **vtable; };
+
 
 /* Prints a message to a specific player's console. */
 void clientcon_msg(struct edict *e, const char *s);
@@ -27,6 +29,20 @@ void clientcon_msg(struct edict *e, const char *s);
  * valid when called in the context of a CON_SERVERSIDE command.
  */
 void clientcon_reply(const char *s);
+
+/*
+ * Sends a message to everyone's chat.
+ * Strings can have control characters embedded to set colors. A control 
+ * character must be at the start of the string to use any subsequent ones. 
+ * 0x02/STX only works at the start of the string, and precludes using the other
+ * control characters.
+ *  = 0x02 (STX) - Use team color up to the end of the player name
+ *  = 0x03 (ETX) - Use team color from this point forward
+ *  = 0x04 (EOT) - Use location color from this point forward
+ *  = 0x05 (ENQ) - Use achievement color from this point forward
+ *  = 0x01 (SOH) - Use normal color from this point forward
+ */
+void chat_msg(const char *msg);
 
 #endif
 
