@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "abi.h"
+#include "clientcon.h"
 #include "accessor.h"
 #include "chunklets/x86.h"
 #include "con_.h"
@@ -42,6 +43,7 @@
 
 #ifdef _WIN32
 #define strcasecmp _stricmp
+#define strncasecmp _strnicmp
 #endif
 
 FEATURE("Left 4 Dead quick resetting")
@@ -113,25 +115,26 @@ static const schar ffsegs[] = {
 		 // Hard Rain: Downpour; Dead Before Dawn Too
 	  4, // Swamp Fever
 	  3, // - seen first propane
-	-12, // - second propane. Also: Death Toll; Dead Air (L4D1); Dark Carnival;
-		 // Cold Front; Riptide
+	-12, // - second propane. Also: Death Toll; Dead Air (L4D1); Cold Front;
+		 // Riptide
 	-15, // Blood Harvest (L4D1); The Sacrifice (L4D1)
 	- 8, // Crash Course; Hard Rain; Left 4 Mario; Alley War
-	-13, // Dead Center; The Parish; Dead Air (L4D2); Dark Blood 2; Grey Scale;
-		 //	Tour of Terror; Carried Off; 2evileyes; Urban Flight; Detour Ahead;
-		 // Energy Crisis; Deadly Dispatch; Blood Proof; Centro
+	-13, // Dead Center; Dark Carnival; The Parish; Dead Air (L4D2); 
+		 // Dark Blood 2; Grey Scale; Tour of Terror; Carried Off; 2evileyes;
+		 // Urban Flight; Detour Ahead; Energy Crisis; Deadly Dispatch;
+		 // Blood Proof; Centro
 	-10, // The Passing; Ceda Fever
 	 11, // The Sacrifice (L4D2)
 	- 4, // - view of biles
-	-16, // Blood Harvest (L4D2), The Last Stand
-	-18, // Cold Stream, Warcelona
+	-16, // Blood Harvest (L4D2); The Last Stand
+	-18, // Cold Stream; Warcelona
 	- 7, // One 4 Nine
 	-14, // Roadkill; Haunted Forest; Suicide Blitz 2
 	-19, // Journey to Splash Mountain
 	-23, // Dark Woods (Extended)
 	-25, // Dark Carnival Remix
 	-28, // Diescraper Redux
-	-31, // Chernobyl: Chapter One, The Curse of Lazar Castle
+	-31, // Chernobyl: Chapter One; The Curse of Lazar Castle
 	-33, // RedemptionII
 	-36, // Deathcraft II
 	- 2, // Outrun
@@ -146,7 +149,6 @@ static const schar ffsegs[] = {
 #define FFIDX_SWAMP 1
 #define FFIDX_DEATHTOLL 3
 #define FFIDX_DEADAIR_L4D1 3
-#define FFIDX_CARNIVAL 3
 #define FFIDX_COLDFRONT 3
 #define FFIDX_RIPTIDE 3
 #define FFIDX_HARVEST_L4D1 4
@@ -155,6 +157,7 @@ static const schar ffsegs[] = {
 #define FFIDX_HARDRAIN 5
 #define FFIDX_MARIO 5
 #define FFIDX_ALLEYWAR 5
+#define FFIDX_CARNIVAL 6
 #define FFIDX_CENTER 6
 #define FFIDX_PARISH 6
 #define FFIDX_DEADAIR_L4D2 6
@@ -197,6 +200,8 @@ static schar ffidx;
 static short ffdelay = 0;
 static float ffadj = 0;
 static int nextmapnum = 0;
+DEF_FEAT_CVAR_MINMAX(sst_l4d_quickreset_timescalereset, "map 1 moment of reset timescale", 10, 10, 100, 0)
+DEF_FEAT_CVAR_MINMAX(sst_l4d_quickreset_timescale, "actual cutscene timescale", 30, 1, 100, 0)
 
 DEF_FEAT_CVAR_MINMAX(sst_l4d_quickreset_peektime,
 		"Number of seconds to show each relevant item spot during fast-forward",
@@ -215,29 +220,38 @@ DEF_FEAT_CCMD_HERE(sst_l4d_quickreset_continue,
 	fastfwd_add(remainder, 30);
 }
 
+DEF_FEAT_CVAR(sst_l4d_quickreset_custom, 
+		"Custom fast-forward duration to use on unsupported campaigns", 0,
+		CON_ARCHIVE)
+
 HANDLE_EVENT(Tick, bool simulating) {
 	if (!nextmapnum && simulating && ffdelay && !--ffdelay) {
-		schar seg = ffsegs[ffidx];
-		float halfwin = con_getvarf(sst_l4d_quickreset_peektime) / 2.0f;
-		float t;
-		if (seg > 0) { // there's more after this one!
-			// if first seg, just take half window. otherwise half + adj = full
-			t = seg - ffadj - halfwin;
-			ffadj = halfwin;
-			++ffidx;
-			ffdelay = seg * 30; // XXX: fixed tickrate as above... fine for now.
+		if_hot (ffidx != -1) {
+			schar seg = ffsegs[ffidx];
+			float halfwin = con_getvarf(sst_l4d_quickreset_peektime) / 2.0f;
+			float t;
+			if (seg > 0) { // there's more after this one!
+				// if first seg, just take half window. otherwise half + adj = full
+				t = seg - ffadj - halfwin;
+				ffadj = halfwin;
+				++ffidx;
+				ffdelay = seg * 30; // XXX: fixed tickrate as above... fine for now.
+			}
+			else { // last one
+				t = -seg - ffadj;
+				ffadj = 0; // don't adjust the *next* fastforward's first seg
+			}
+			fastfwd(t, con_getvarf(sst_l4d_quickreset_timescale));
+		} else {
+			fastfwd(con_getvari(sst_l4d_quickreset_custom), con_getvarf(sst_l4d_quickreset_timescale));
+			con_msg("Unsupported custom campaign: will use duration defined by sst_l4d_quickreset_custom");
 		}
-		else { // last one
-			t = -seg - ffadj;
-			ffadj = 0; // don't adjust the *next* fastforward's first seg
-		}
-		fastfwd(t, 30);
 	}
 }
 
-typedef void (*VCALLCONV OnGameplayStart_func)(struct CDirector *this);
+typedef void (*VCALLCONV OnGameplayStart_func)(void *this);
 static OnGameplayStart_func orig_OnGameplayStart;
-static void VCALLCONV hook_OnGameplayStart(struct CDirector *this) {
+static void VCALLCONV hook_OnGameplayStart(void *this) {
 	orig_OnGameplayStart(this);
 	if (nextmapnum) {
 		// if we changed map more than 1 time, cancel the reset. this'll happen
@@ -255,15 +269,15 @@ static void VCALLCONV hook_OnGameplayStart(struct CDirector *this) {
 
 static int getffidx(const char *campaign) {
 	if (GAMETYPE_MATCHES(L4D1)) {
-		if (!strcmp(campaign, "Hospital")) return FFIDX_NOMERCY;
-		if (!strcmp(campaign, "SmallTown")) return FFIDX_DEATHTOLL;
-		if (!strcmp(campaign, "Airport")) return FFIDX_DEADAIR_L4D1;
-		if (!strcmp(campaign, "Farm")) return FFIDX_HARVEST_L4D1;
-		if (!strcmp(campaign, "River")) return FFIDX_SACRIFICE_L4D1;
-		if (!strcmp(campaign, "Garage")) return FFIDX_CRASHCOURSE;
+		if (!strcasecmp(campaign, "Hospital")) return FFIDX_NOMERCY;
+		if (!strcasecmp(campaign, "SmallTown")) return FFIDX_DEATHTOLL;
+		if (!strcasecmp(campaign, "Airport")) return FFIDX_DEADAIR_L4D1;
+		if (!strcasecmp(campaign, "Farm")) return FFIDX_HARVEST_L4D1;
+		if (!strcasecmp(campaign, "River")) return FFIDX_SACRIFICE_L4D1;
+		if (!strcasecmp(campaign, "Garage")) return FFIDX_CRASHCOURSE;
 	}
 	else /* L4D2 */ {
-		if (!strncmp(campaign, "L4D2C", 5)) {
+		if (!strncasecmp(campaign, "L4D2C", 5)) {
 			int ret;
 			switch (campaign[5]) {
 				case '1':
@@ -293,51 +307,51 @@ static int getffidx(const char *campaign) {
 		}
 		// slow but uncommon case: this giant list of custom campaigns, for fun.
 		// TODO(opt): come up with something smart to do here on some rainy day?
-		if (!strcmp(campaign, "darkblood2")) return FFIDX_DARKBLOOD2;
-		if (!strcmp(campaign, "Greyscale")) return FFIDX_GREYSCALE;
-		if (!strcmp(campaign, "yomimario2")) return FFIDX_MARIO;
+		if (!strcasecmp(campaign, "darkblood2")) return FFIDX_DARKBLOOD2;
+		if (!strcasecmp(campaign, "Greyscale")) return FFIDX_GREYSCALE;
+		if (!strcasecmp(campaign, "yomimario2")) return FFIDX_MARIO;
 		// TODO(compat): ravenholm cutscene length is actually random; this is
 		// the short one only. we'll want to solve that some day, somehow...
-		if (!strcmp(campaign, "ravenholmwar2")) return FFIDX_RAVENHOLM;
-		if (!strcmp(campaign, "warcelona")) return FFIDX_WARCELONA;
-		if (!strcmp(campaign, "tot")) return FFIDX_TOUROFTERROR;
-		if (!strcmp(campaign, "damitcomplete")) return FFIDX_DAMIT;
-		if (!strcmp(campaign, "CarriedOff")) return FFIDX_CARRIEDOFF;
-		if (!strcmp(campaign, "JourneyToSplashMountain")) return FFIDX_SPLASHMTN;
-		if (!strcmp(campaign, "rkls")) return FFIDX_ROADKILL;
-		if (!strcmp(campaign, "CedaFever")) return FFIDX_CEDAFEVER;
-		if (!strcmp(campaign, "coldfront")) return FFIDX_COLDFRONT;
-		if (!strcmp(campaign, "DarkCarnivalRemix")) return FFIDX_CARNIVALREMIX;
-		if (!strncmp(campaign, "DayBreak", 8)) {
-			if (campaign[8] == '\0' || !strcmp(campaign + 8, "v3")) {
+		if (!strcasecmp(campaign, "ravenholmwar2")) return FFIDX_RAVENHOLM;
+		if (!strcasecmp(campaign, "warcelona")) return FFIDX_WARCELONA;
+		if (!strcasecmp(campaign, "tot")) return FFIDX_TOUROFTERROR;
+		if (!strcasecmp(campaign, "damitcomplete")) return FFIDX_DAMIT;
+		if (!strcasecmp(campaign, "CarriedOff")) return FFIDX_CARRIEDOFF;
+		if (!strcasecmp(campaign, "JourneyToSplashMountain")) return FFIDX_SPLASHMTN;
+		if (!strcasecmp(campaign, "rkls")) return FFIDX_ROADKILL;
+		if (!strcasecmp(campaign, "CedaFever")) return FFIDX_CEDAFEVER;
+		if (!strcasecmp(campaign, "coldfront")) return FFIDX_COLDFRONT;
+		if (!strcasecmp(campaign, "DarkCarnivalRemix")) return FFIDX_CARNIVALREMIX;
+		if (!strncasecmp(campaign, "DayBreak", 8)) {
+			if (campaign[8] == '\0' || !strcasecmp(campaign + 8, "v3")) {
 				return FFIDX_DAYBREAK;
 			}
 			return -1;
 		}
-		if (!strcmp(campaign, "Downpour")) return FFIDX_HARDRAINREMIX;
-		if (!strcmp(campaign, "red")) return FFIDX_REDEMPTIONII;
-		if (!strcmp(campaign, "Diescraper362")) return FFIDX_DIESCRAPER;
-		if (!strcmp(campaign, "dbd2")) return FFIDX_DEADBEFOREDAWNTOO;
-		if (!strcmp(campaign, "2evileyes")) return FFIDX_2EVILEYES;
-		if (!strcmp(campaign, "Chernobyl")) return FFIDX_CHERNOBYL;
-		if (!strcmp(campaign, "darkwood")) return FFIDX_DARKWOODS;
-		if (!strcmp(campaign, "TheCurseofLazarCastle")) return FFIDX_LAZARCASTLE;
-		if (!strcmp(campaign, "urbanflight")) return FFIDX_URBANFLIGHT;
-		if (!strcmp(campaign, "BloodTracks")) return FFIDX_BLOODTRACKS;
-		if (!strcmp(campaign, "City17l4d2")) return FFIDX_CITY17;
-		if (!strcmp(campaign, "Deathcraft")) return FFIDX_DEATHCRAFT;
-		if (!strcmp(campaign, "detourahead")) return FFIDX_DETOURAHEAD;
-		if (!strcmp(campaign, "hauntedforest")) return FFIDX_HAUNTEDFOREST;
-		if (!strcmp(campaign, "One4Nine")) return FFIDX_ONE4NINE;
-		if (!strcmp(campaign, "suicideblitz2")) return FFIDX_SUICIDEBLITZ2;
-		if (!strcmp(campaign, "energycrisis")) return FFIDX_ENERGYCRISIS;
-		if (!strcmp(campaign, "DDCW")) return FFIDX_DEADLYDISPATCH;
-		if (!strcmp(campaign, "Outrun")) return FFIDX_OUTRUN;
-		if (!strcmp(campaign, "BloodProof")) return FFIDX_BLOODPROOF;
-		if (!strcmp(campaign, "centro")) return FFIDX_CENTRO;
-		if (!strcmp(campaign, "riptide")) return FFIDX_RIPTIDE;
-		if (!strcmp(campaign, "jsarena2")) return FFIDX_ARENAOFTHEDEAD;
-		if (!strcmp(campaign, "AlleyWar")) return FFIDX_ALLEYWAR;
+		if (!strcasecmp(campaign, "Downpour")) return FFIDX_HARDRAINREMIX;
+		if (!strcasecmp(campaign, "red")) return FFIDX_REDEMPTIONII;
+		if (!strcasecmp(campaign, "Diescraper362")) return FFIDX_DIESCRAPER;
+		if (!strcasecmp(campaign, "dbd2")) return FFIDX_DEADBEFOREDAWNTOO;
+		if (!strcasecmp(campaign, "2evileyes")) return FFIDX_2EVILEYES;
+		if (!strcasecmp(campaign, "Chernobyl")) return FFIDX_CHERNOBYL;
+		if (!strcasecmp(campaign, "darkwood")) return FFIDX_DARKWOODS;
+		if (!strcasecmp(campaign, "TheCurseofLazarCastle")) return FFIDX_LAZARCASTLE;
+		if (!strcasecmp(campaign, "urbanflight")) return FFIDX_URBANFLIGHT;
+		if (!strcasecmp(campaign, "BloodTracks")) return FFIDX_BLOODTRACKS;
+		if (!strcasecmp(campaign, "City17l4d2")) return FFIDX_CITY17;
+		if (!strcasecmp(campaign, "Deathcraft")) return FFIDX_DEATHCRAFT;
+		if (!strcasecmp(campaign, "detourahead")) return FFIDX_DETOURAHEAD;
+		if (!strcasecmp(campaign, "hauntedforest")) return FFIDX_HAUNTEDFOREST;
+		if (!strcasecmp(campaign, "One4Nine")) return FFIDX_ONE4NINE;
+		if (!strcasecmp(campaign, "suicideblitz2")) return FFIDX_SUICIDEBLITZ2;
+		if (!strcasecmp(campaign, "energycrisis")) return FFIDX_ENERGYCRISIS;
+		if (!strcasecmp(campaign, "DDCW")) return FFIDX_DEADLYDISPATCH;
+		if (!strcasecmp(campaign, "Outrun")) return FFIDX_OUTRUN;
+		if (!strcasecmp(campaign, "BloodProof")) return FFIDX_BLOODPROOF;
+		if (!strcasecmp(campaign, "centro")) return FFIDX_CENTRO;
+		if (!strcasecmp(campaign, "riptide")) return FFIDX_RIPTIDE;
+		if (!strcasecmp(campaign, "jsarena2")) return FFIDX_ARENAOFTHEDEAD;
+		if (!strcasecmp(campaign, "AlleyWar")) return FFIDX_ALLEYWAR;
 	}
 	return -1; // if unknown, just don't fast-forward, I guess.
 }
@@ -366,15 +380,15 @@ DEF_FEAT_CCMD_HERE(sst_l4d_quickreset,
 	else {
 		reset();
 		if (l4dmm_firstmap()) {
-			fastfwd(0.8, 10); // same-map reset is delayed by about a second
+			fastfwd(0.8, con_getvarf(sst_l4d_quickreset_timescalereset)); // same-map reset is delayed by about a second
 			nextmapnum = 0; // reset this just in case it got stuck... somehow?
 		}
 		else {
 			nextmapnum = gameserver_spawncount() + 1; // same as above
 		}
 	}
-	if (campaign && con_getvari(sst_l4d_quickreset_fastfwd) &&
-			(ffidx = getffidx(campaign)) != -1) {
+	if (campaign && con_getvari(sst_l4d_quickreset_fastfwd)) {
+		ffidx = getffidx(campaign);
 		ffdelay = 45; // 1.5s
 	}
 	if (FinaleEscapeState) *FinaleEscapeState = 0; // see comment in INIT
