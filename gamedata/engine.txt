@@ -200,4 +200,10 @@ vtidx_CBCSConnect
 			L4D1_1015plus 12
 		L4D2 13
 
+# CSteam3Server
+off_NoSteamLogonCallback
+	L4D1 116 # stable
+	L4D2 100 # changes frequently in L4D2 so we just iterate starting from 100
+	# Portal2 120 # build 5723/pdb. no idea about anything else
+
 # vi: sw=4 ts=4 noet tw=80 cc=80

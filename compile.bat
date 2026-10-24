@@ -130,6 +130,7 @@ setlocal DisableDelayedExpansion
 :+ l4dwarp.c
 :+ nomute.c
 :+ nosleep.c
+:+ nosteamlogon.c
 :+ os.c
 :+ portalcolours.c
 :+ portalisg.c
